@@ -47,6 +47,45 @@ const Icon = ({ name, size = 16, ...p }) => {
   )
 }
 
+/* ─── Flying rockets ────────────────────────────────── */
+function FlyingRocket({ side = 'left', top, delay = 0, duration = 2.2, repeatDelay = 14 }) {
+  const fromLeft = side === 'left'
+  return (
+    <motion.div
+      style={{
+        position: 'fixed',
+        top,
+        zIndex: 5,
+        pointerEvents: 'none',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 0,
+      }}
+      initial={{ x: fromLeft ? '-120px' : '110vw' }}
+      animate={{ x: fromLeft ? '110vw' : '-120px', y: fromLeft ? -40 : 40 }}
+      transition={{ duration, delay, ease: [0.3, 0, 0.7, 1], repeat: Infinity, repeatDelay }}
+    >
+      {/* trail */}
+      <motion.div style={{
+        width: 72, height: 3,
+        background: fromLeft
+          ? 'linear-gradient(to right, transparent, rgba(197,247,0,0.5))'
+          : 'linear-gradient(to left,  transparent, rgba(197,247,0,0.5))',
+        borderRadius: 9999,
+        filter: 'blur(2px)',
+        order: fromLeft ? 0 : 1,
+      }} />
+      <span style={{
+        fontSize: 22,
+        filter: 'drop-shadow(0 0 10px rgba(197,247,0,0.9)) drop-shadow(0 0 24px rgba(197,247,0,0.5))',
+        transform: fromLeft ? 'rotate(90deg)' : 'rotate(-90deg)',
+        display: 'block',
+        order: fromLeft ? 1 : 0,
+      }}>🚀</span>
+    </motion.div>
+  )
+}
+
 /* ─── Elegant hero shapes ───────────────────────────── */
 function ElegantShape({ delay = 0, width = 400, height = 100, rotate = 0, gradient, style: pos }) {
   return (
@@ -527,6 +566,10 @@ export default function App() {
   return (
     <>
       <Floats />
+      <FlyingRocket side="left"  top="22%" delay={1.0} duration={2.4} repeatDelay={16} />
+      <FlyingRocket side="right" top="38%" delay={3.2} duration={2.0} repeatDelay={18} />
+      <FlyingRocket side="left"  top="58%" delay={6.0} duration={2.6} repeatDelay={22} />
+      <FlyingRocket side="right" top="15%" delay={8.5} duration={1.9} repeatDelay={20} />
       <div style={{ position: 'relative', zIndex: 1 }}>
       <nav className="up">
         <div className="dock">
@@ -583,7 +626,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.68, ease: [0.25, 0.4, 0.25, 1] }}
           >
-            <a href="#install" className="btn btn-primary">Get Ship <Icon name="arrow" size={14} /></a>
+            <a href="#install" className="btn btn-primary">Start Shipping <Icon name="arrow" size={14} /></a>
             <a href="https://github.com/Koded0214h/ship-it" className="btn btn-outline">GitHub</a>
           </motion.div>
           <motion.div
