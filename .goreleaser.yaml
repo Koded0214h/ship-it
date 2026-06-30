@@ -1,0 +1,71 @@
+version: 2
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: ship
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ignore:
+      - goos: windows
+        goarch: arm64
+    ldflags:
+      - -s -w
+      - -X github.com/kodedlabs/ship/cmd.version={{.Version}}
+
+archives:
+  - formats: [tar.gz]
+    name_template: "ship_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    files:
+      - README.md
+      - LICENSE
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  use: github
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^chore:"
+      - "Merge pull request"
+      - "Merge branch"
+
+release:
+  github:
+    owner: kodedlabs
+    name: ship
+  name_template: "v{{ .Version }}"
+  draft: false
+  prerelease: auto
+
+brews:
+  - name: ship
+    repository:
+      owner: kodedlabs
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/kodedlabs/ship"
+    description: "Deploy to your VPS using plain English. AI-generated Docker, Nginx, SSL, and CI/CD."
+    license: "MIT"
+    install: |
+      bin.install "ship"
+    test: |
+      system "#{bin}/ship", "--version"

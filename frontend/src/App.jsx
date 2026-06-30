@@ -54,6 +54,7 @@ function ElegantShape({ delay = 0, width = 400, height = 100, rotate = 0, gradie
       initial={{ opacity: 0, y: -150, rotate: rotate - 15 }}
       animate={{ opacity: 1, y: 0, rotate }}
       transition={{ duration: 2.4, delay, ease: [0.23, 0.86, 0.39, 0.96], opacity: { duration: 1.2 } }}
+      className="hero-shape"
       style={{ position: 'absolute', ...pos }}
     >
       <motion.div
@@ -621,9 +622,9 @@ export default function App() {
             </div>
             <div className="install-cmds">
               {[
-                { label: 'Homebrew', cmd: 'brew install ship' },
-                { label: 'npm',      cmd: 'npm install -g ship-cli' },
-                { label: 'curl',     cmd: 'curl -fsSL shipcli.dev/install.sh | bash' },
+                { label: 'Homebrew',   cmd: 'brew install kodedlabs/tap/ship' },
+                { label: 'curl',       cmd: 'curl -fsSL https://raw.githubusercontent.com/kodedlabs/ship/main/install.sh | sh' },
+                { label: 'go install', cmd: 'go install github.com/kodedlabs/ship@latest' },
               ].map(({ label, cmd }) => (
                 <div key={label}>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: 'var(--text-3)', marginBottom: 5, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</div>

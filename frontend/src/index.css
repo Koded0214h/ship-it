@@ -731,16 +731,63 @@ footer {
 .scramble { display: inline; }
 
 /* ─── Responsive ────────────────────── */
-@media (max-width: 900px) {
-  #hero         { grid-template-columns: 1fr; padding: 100px 0 40px; }
-  .how-steps    { grid-template-columns: 1fr; }
-  .install-grid { grid-template-columns: 1fr; }
-  .roadmap-grid { grid-template-columns: 1fr; }
+@media (max-width: 768px) {
+  /* hide floating hero shapes — they overlap text on small screens */
+  .hero-shape { display: none; }
+
+  /* dock — collapse middle links, stay compact */
+  .dock-item   { display: none; }
+  .dock-sep    { display: none; }
+  .dock-logo   { padding: 5px 10px; }
+  .dock-cta    { margin-left: 0; }
+  .dock        { gap: 4px; }
+
+  /* hero */
+  #hero        { padding: 100px 24px 60px; }
+  .hero-center { max-width: 100%; }
+  h1           { font-size: clamp(2.6rem, 10vw, 4rem); }
+  .hero-sub    { font-size: 0.95rem; }
+  .hero-ctas   { gap: 8px; }
+  .hero-terminal { max-width: 100%; }
+  .terminal-body { min-height: 240px; }
+
+  /* layout */
+  .wrap        { padding: 0 20px; }
+  section      { padding: 64px 0; }
+
+  /* stats */
+  .stats-row   { flex-wrap: wrap; }
+  .stat-item   { flex: 1 1 40%; border-bottom: 1px solid var(--border); }
+
+  /* features */
   .features-header { flex-direction: column; align-items: flex-start; gap: 12px; }
-  .feature-row  { grid-template-columns: 1fr 36px; }
+  .feature-row { grid-template-columns: 1fr 36px; padding-left: 0; gap: 16px; }
   .feature-desc { display: none; }
-  .feature-expand-inner { padding-left: 0; }
-  .nav-links    { display: none; }
+  .feature-expand-inner { padding: 0 0 16px 0; }
+
+  /* how it works */
+  .flow-wrap   { flex-direction: column; }
+  .flow-node   { border-right: 1px solid var(--border); border-bottom: none; }
+  .flow-node:last-child { border-bottom: 1px solid var(--border); }
+  .flow-arrow-icon { display: none; }
+  .flow-preview-box { padding: 16px; }
+
+  /* install */
+  .install-grid { grid-template-columns: 1fr; gap: 36px; }
+
+  /* roadmap */
+  .roadmap-grid { grid-template-columns: 1fr; }
+
+  /* faq */
+  .faq-list    { margin-top: 32px; }
+}
+
+@media (max-width: 480px) {
+  h1           { font-size: clamp(2.2rem, 12vw, 3rem); }
+  .hero-ctas   { flex-direction: column; align-items: center; }
+  .btn         { width: 100%; justify-content: center; }
+  .stat-item   { flex: 1 1 100%; }
+  .how-steps   { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {
