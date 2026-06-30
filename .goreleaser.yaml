@@ -49,8 +49,8 @@ changelog:
 
 release:
   github:
-    owner: kodedlabs
-    name: ship
+    owner: Koded0214h
+    name: ship-it
   name_template: "v{{ .Version }}"
   draft: false
   prerelease: auto
@@ -58,11 +58,11 @@ release:
 brews:
   - name: ship
     repository:
-      owner: kodedlabs
+      owner: Koded0214h
       name: homebrew-tap
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
-    homepage: "https://github.com/kodedlabs/ship"
+    homepage: "https://github.com/Koded0214h/ship-it"
     description: "Deploy to your VPS using plain English. AI-generated Docker, Nginx, SSL, and CI/CD."
     license: "MIT"
     install: |
