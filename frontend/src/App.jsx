@@ -47,41 +47,102 @@ const Icon = ({ name, size = 16, ...p }) => {
   )
 }
 
+/* ─── Rocket SVG ────────────────────────────────────── */
+function RocketSVG() {
+  return (
+    <svg width="90" height="180" viewBox="0 0 60 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M30 2 L46 28 L46 80 L14 80 L14 28 Z" fill="#c5f700"/>
+      <path d="M30 2 L37 24 L30 21 Z" fill="rgba(255,255,255,0.22)"/>
+      <circle cx="30" cy="47" r="10" fill="#0a0a0a" stroke="#c5f700" strokeWidth="2"/>
+      <circle cx="27" cy="44" r="3" fill="rgba(255,255,255,0.32)"/>
+      <path d="M14 58 L1 85 L14 80 Z" fill="#c5f700" fillOpacity="0.72"/>
+      <path d="M46 58 L59 85 L46 80 Z" fill="#c5f700" fillOpacity="0.72"/>
+      <rect x="23" y="80" width="14" height="8" rx="1" fill="rgba(197,247,0,0.55)"/>
+      <path d="M16 88 C20 108 27 118 30 120 C33 118 40 108 44 88 Z" fill="rgba(197,247,0,0.18)"/>
+      <path d="M22 88 C25 103 28 112 30 117 C32 112 35 103 38 88 Z" fill="rgba(255,220,70,0.32)"/>
+      <path d="M27 88 L30 106 L33 88 Z" fill="rgba(255,255,255,0.45)"/>
+    </svg>
+  )
+}
+
 /* ─── Flying rockets ────────────────────────────────── */
-function FlyingRocket({ side = 'left', top, delay = 0, duration = 2.2, repeatDelay = 14 }) {
+const DUST = [
+  { size: 5, op: 0.9, blur: 0,   dx:  0 },
+  { size: 4, op: 0.7, blur: 1,   dx:  6 },
+  { size: 3, op: 0.6, blur: 1,   dx: -5 },
+  { size: 3, op: 0.5, blur: 2,   dx:  3 },
+  { size: 2, op: 0.4, blur: 2,   dx: -3 },
+  { size: 2, op: 0.3, blur: 2.5, dx:  7 },
+]
+
+function FlyingRocket({ side = 'left', delay = 0, duration = 3.8, repeatDelay = 20 }) {
   const fromLeft = side === 'left'
   return (
     <motion.div
       style={{
         position: 'fixed',
-        top,
+        left: fromLeft ? 0 : 'auto',
+        right: fromLeft ? 'auto' : 0,
+        bottom: 0,
         zIndex: 5,
         pointerEvents: 'none',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 0,
       }}
-      initial={{ x: fromLeft ? '-120px' : '110vw' }}
-      animate={{ x: fromLeft ? '110vw' : '-120px', y: fromLeft ? -40 : 40 }}
-      transition={{ duration, delay, ease: [0.3, 0, 0.7, 1], repeat: Infinity, repeatDelay }}
+      animate={{
+        x: fromLeft
+          ? [-300, -180, 50,  600, 1600, 2900]
+          : [ 300,  180, -50, -600, -1600, -2900],
+        y: [320, 80, -250, -680, -1280, -2100],
+      }}
+      transition={{
+        duration,
+        delay,
+        ease: 'linear',
+        times: [0, 0.08, 0.24, 0.46, 0.72, 1],
+        repeat: Infinity,
+        repeatDelay,
+      }}
     >
-      {/* trail */}
-      <motion.div style={{
-        width: 72, height: 3,
-        background: fromLeft
-          ? 'linear-gradient(to right, transparent, rgba(197,247,0,0.5))'
-          : 'linear-gradient(to left,  transparent, rgba(197,247,0,0.5))',
-        borderRadius: 9999,
-        filter: 'blur(2px)',
-        order: fromLeft ? 0 : 1,
-      }} />
-      <span style={{
-        fontSize: 22,
-        filter: 'drop-shadow(0 0 10px rgba(197,247,0,0.9)) drop-shadow(0 0 24px rgba(197,247,0,0.5))',
-        transform: fromLeft ? 'rotate(90deg)' : 'rotate(-90deg)',
-        display: 'block',
-        order: fromLeft ? 1 : 0,
-      }}>🚀</span>
+      <div style={{
+        transform: `rotate(${fromLeft ? '40deg' : '-40deg'})`,
+        position: 'relative',
+        display: 'inline-block',
+        filter: 'drop-shadow(0 0 14px rgba(197,247,0,0.65)) drop-shadow(0 0 36px rgba(197,247,0,0.28))',
+      }}>
+        {/* Dust particles */}
+        {DUST.map((p, i) => (
+          <motion.div
+            key={i}
+            style={{
+              position: 'absolute',
+              top: '70%',
+              left: `calc(50% + ${p.dx}px)`,
+              width: p.size,
+              height: p.size,
+              borderRadius: '50%',
+              background: '#c5f700',
+              filter: `blur(${p.blur}px)`,
+              translateX: '-50%',
+              zIndex: 2,
+            }}
+            animate={{ y: [0, 40 + i * 10], opacity: [p.op, 0], scale: [1, 0.15] }}
+            transition={{ duration: 0.42 + i * 0.07, delay: i * 0.06, repeat: Infinity, ease: 'easeOut' }}
+          />
+        ))}
+        {/* Glow trail */}
+        <div style={{
+          position: 'absolute',
+          top: '72%',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          width: 5,
+          height: 180,
+          background: 'linear-gradient(to bottom, rgba(197,247,0,0.5), transparent)',
+          filter: 'blur(5px)',
+          borderRadius: 9999,
+          zIndex: -1,
+        }} />
+        <RocketSVG />
+      </div>
     </motion.div>
   )
 }
@@ -566,10 +627,8 @@ export default function App() {
   return (
     <>
       <Floats />
-      <FlyingRocket side="left"  top="22%" delay={1.0} duration={2.4} repeatDelay={16} />
-      <FlyingRocket side="right" top="38%" delay={3.2} duration={2.0} repeatDelay={18} />
-      <FlyingRocket side="left"  top="58%" delay={6.0} duration={2.6} repeatDelay={22} />
-      <FlyingRocket side="right" top="15%" delay={8.5} duration={1.9} repeatDelay={20} />
+      <FlyingRocket side="left"  delay={1.0} duration={3.8} repeatDelay={20} />
+      <FlyingRocket side="right" delay={1.0} duration={3.8} repeatDelay={20} />
       <div style={{ position: 'relative', zIndex: 1 }}>
       <nav className="up">
         <div className="dock">
@@ -665,8 +724,8 @@ export default function App() {
             </div>
             <div className="install-cmds">
               {[
-                { label: 'Homebrew',   cmd: 'brew install kodedlabs/tap/ship' },
-                { label: 'curl',       cmd: 'curl -fsSL https://raw.githubusercontent.com/kodedlabs/ship/main/install.sh | sh' },
+                { label: 'Homebrew',   cmd: 'brew install Koded0214h/tap/ship' },
+                { label: 'curl',       cmd: 'curl -fsSL https://raw.githubusercontent.com/Koded0214h/ship-it/main/install.sh | sh' },
                 { label: 'go install', cmd: 'go install github.com/kodedlabs/ship@latest' },
               ].map(({ label, cmd }) => (
                 <div key={label}>
