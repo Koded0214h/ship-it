@@ -1,0 +1,4 @@
+.vscode/
+
+# Ship deployment config (contains secrets)
+.ship/
