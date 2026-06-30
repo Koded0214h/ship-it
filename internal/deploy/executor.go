@@ -131,9 +131,10 @@ func (e *Executor) uploadEnvTemplate() error {
 func (e *Executor) startContainers() error {
 	logFile := fmt.Sprintf("%s/deploy.log", e.appDir)
 
-	// down first to release any ports held by previous containers, then up fresh
+	// stop and remove ALL containers (dedicated VPS — Ship owns Docker state),
+	// prune corrupted build cache, then bring up fresh
 	launchCmd := fmt.Sprintf(
-		"cd %s && nohup bash -c 'docker compose down --remove-orphans 2>/dev/null; docker compose pull 2>/dev/null; docker compose up -d --build' > %s 2>&1 &",
+		"cd %s && nohup bash -c 'docker ps -q | xargs -r docker stop 2>/dev/null; docker ps -aq | xargs -r docker rm 2>/dev/null; docker builder prune -f 2>/dev/null; docker compose up -d --build' > %s 2>&1 &",
 		e.appDir, logFile,
 	)
 	if _, stderr, err := e.client.Exec(launchCmd); err != nil {

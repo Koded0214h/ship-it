@@ -334,7 +334,7 @@ nav.solid { background: rgba(10,10,10,0.92); border-color: var(--border); backdr
   grid-template-columns: 220px 1fr 36px;
   align-items: center;
   gap: 32px;
-  padding: 22px 0;
+  padding: 22px 0 22px 40px;
   border-bottom: 1px solid var(--border);
   cursor: pointer;
   transition: background 0.15s;
@@ -358,10 +358,9 @@ nav.solid { background: rgba(10,10,10,0.92); border-color: var(--border); backdr
 }
 .feature-expand.open { max-height: 120px; }
 .feature-expand-inner {
-  padding: 0 0 20px 0;
   font-size: 0.88rem;
   color: var(--text-2);
-  padding-left: 252px;
+  padding: 0 0 20px calc(252px + 40px);
 }
 .feature-arrow {
   color: var(--text-3); opacity: 0.5; transition: all 0.2s;

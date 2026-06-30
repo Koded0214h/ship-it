@@ -15,45 +15,56 @@ func NginxConfig(domain, appName string, port int, ssl bool) string {
 }
 
 func basicNginxConfig(serverName, appName string, port int) string {
-	return fmt.Sprintf(`upstream %s {
-    server 127.0.0.1:%d;
-    keepalive 64;
+	return fmt.Sprintf(`events {
+    worker_connections 1024;
 }
 
-server {
-    listen 80;
-    server_name %s;
-
-    client_max_body_size 50M;
-    client_body_timeout 60s;
-
-    location / {
-        proxy_pass http://%s;
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade $http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-        proxy_cache_bypass $http_upgrade;
-        proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+http {
+    upstream %s {
+        server app:%d;
+        keepalive 64;
     }
 
-    location /health {
-        access_log off;
-        return 200 "ok\n";
-        add_header Content-Type text/plain;
+    server {
+        listen 80;
+        server_name %s;
+
+        client_max_body_size 50M;
+        client_body_timeout 60s;
+
+        location / {
+            proxy_pass http://%s;
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection 'upgrade';
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_cache_bypass $http_upgrade;
+            proxy_connect_timeout 60s;
+            proxy_send_timeout 60s;
+            proxy_read_timeout 60s;
+        }
+
+        location /health {
+            access_log off;
+            return 200 "ok\n";
+            add_header Content-Type text/plain;
+        }
     }
 }
 `, appName, port, serverName, appName)
 }
 
 func sslNginxConfig(domain string, port int) string {
-	return fmt.Sprintf(`upstream app {
-    server 127.0.0.1:%d;
+	return fmt.Sprintf(`events {
+    worker_connections 1024;
+}
+
+http {
+upstream app {
+    server app:%d;
     keepalive 64;
 }
 
@@ -100,5 +111,6 @@ server {
         add_header Content-Type text/plain;
     }
 }
+} /* http */
 `, port, domain, domain, domain, domain)
 }

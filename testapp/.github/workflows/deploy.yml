@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy to Server
 
 on:
   push:
@@ -8,23 +8,28 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: production
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy via SSH
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.9.0
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          script: |
-            set -e
-            cd /path/to/your/app_directory # IMPORTANT: Change this to your application's deployment path on the server
-            git pull origin main
-            docker compose pull
-            docker compose up -d --remove-orphans
-            docker image prune -f
-            echo "Deployment complete!"
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          PROJECT_DIR: /var/www/your-fastapi-app # Customize this path on your server
+        run: |
+          ssh $SSH_USER@$SSH_HOST "mkdir -p $PROJECT_DIR"
+          rsync -avz --exclude='.git/' --exclude='node_modules/' --exclude='__pycache__/' --delete \
+              ./ $SSH_USER@$SSH_HOST:$PROJECT_DIR/
+          ssh $SSH_USER@$SSH_HOST "cd $PROJECT_DIR && docker compose pull && docker compose up -d --remove-orphans"

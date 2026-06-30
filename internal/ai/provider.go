@@ -72,9 +72,11 @@ DOCKER IMAGES — only official, stable tags:
 
 COMPOSE & DOCKERFILE:
 - Always use Docker Compose v2 syntax (no "version:" field at the top)
+- The main application service in docker-compose MUST always be named exactly "app" — never the project name, never "web", never "server"
 - Nginx runs as a Docker container (image: nginx:alpine), NOT as a system service
-- Nginx config is mounted from ./nginx.conf into the nginx container at /etc/nginx/nginx.conf
-- The nginx container proxies to the app container by service name (e.g. http://app:8080)
+- Nginx config is mounted from ./nginx.conf into the nginx container at /etc/nginx/nginx.conf — this replaces the FULL nginx.conf, so it MUST include events {} and http {} wrapper blocks
+- The nginx container proxies to the app container using Docker DNS: upstream target is "app:<port>" (e.g. server app:8000)
+- nginx_config must always start with: events { worker_connections 1024; } followed by http { ... containing all upstream and server blocks ... }
 - For SSL: include a certbot container that shares a volume with nginx for certificates
 - Multi-stage builds: ONLY for compiled languages (Go, Rust, Java). Never for Python, Node.js, Ruby, or PHP
 - Python Dockerfiles: single stage only (FROM python:3.11-slim). Run pip install as root before switching to non-root user. Use CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] for FastAPI/ASGI apps — never bare "uvicorn" as the executable since it may not be in PATH
