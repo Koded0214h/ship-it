@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { motion } from 'framer-motion'
 import './index.css'
 
 /* ─── Background floats ─────────────────────────────── */
@@ -46,6 +47,32 @@ const Icon = ({ name, size = 16, ...p }) => {
   )
 }
 
+/* ─── Elegant hero shapes ───────────────────────────── */
+function ElegantShape({ delay = 0, width = 400, height = 100, rotate = 0, gradient, style: pos }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -150, rotate: rotate - 15 }}
+      animate={{ opacity: 1, y: 0, rotate }}
+      transition={{ duration: 2.4, delay, ease: [0.23, 0.86, 0.39, 0.96], opacity: { duration: 1.2 } }}
+      style={{ position: 'absolute', ...pos }}
+    >
+      <motion.div
+        animate={{ y: [0, 15, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
+        style={{ width, height, position: 'relative' }}
+      >
+        <div style={{
+          position: 'absolute', inset: 0, borderRadius: '9999px',
+          background: gradient,
+          backdropFilter: 'blur(2px)',
+          border: '1px solid rgba(197,247,0,0.10)',
+          boxShadow: '0 8px 32px 0 rgba(197,247,0,0.05)',
+        }} />
+      </motion.div>
+    </motion.div>
+  )
+}
+
 /* ─── Cursor glow ───────────────────────────────────── */
 function useCursorGlow(ref) {
   useEffect(() => {
@@ -66,14 +93,7 @@ function useSmartNav() {
   useEffect(() => {
     const nav = document.querySelector('nav')
     if (!nav) return
-    let last = 0
-    const h = () => {
-      const y = window.scrollY
-      nav.classList.toggle('solid', y > 40)
-      nav.classList.toggle('down', y > last && y > 80)
-      nav.classList.toggle('up', y <= last || y <= 80)
-      last = y
-    }
+    const h = () => nav.classList.toggle('solid', window.scrollY > 40)
     window.addEventListener('scroll', h, { passive: true })
     return () => window.removeEventListener('scroll', h)
   }, [])
@@ -508,42 +528,74 @@ export default function App() {
       <Floats />
       <div style={{ position: 'relative', zIndex: 1 }}>
       <nav className="up">
-        <div className="nav-inner">
-          <a href="#" className="nav-logo"><span className="dollar">$</span>&nbsp;ship</a>
-          <ul className="nav-links">
-            <li><a href="#features">Features</a></li>
-            <li><a href="#how">How it works</a></li>
-            <li><a href="#roadmap">Roadmap</a></li>
-            <li><a href="https://github.com/kodedlabs/ship">GitHub</a></li>
-          </ul>
-          <a href="#install" className="btn btn-primary">Install</a>
+        <div className="dock">
+          <a href="#" className="dock-logo"><span className="dollar">$</span>&nbsp;ship</a>
+          <div className="dock-sep" />
+          <a href="#features" className="dock-item"><Icon name="scan" size={13} />Features</a>
+          <a href="#how" className="dock-item"><Icon name="term" size={13} />How it works</a>
+          <a href="#roadmap" className="dock-item"><Icon name="pulse" size={13} />Roadmap</a>
+          <a href="https://github.com/Koded0214h/ship-it" className="dock-item"><Icon name="git" size={13} />GitHub</a>
+          <div className="dock-sep" />
+          <a href="#install" className="dock-cta">Install <Icon name="arrow" size={12} /></a>
         </div>
       </nav>
 
       {/* ── Hero ── */}
       <section id="hero" ref={heroRef}>
-        <div className="wrap" style={{ display: 'contents' }}>
-          <div className="hero-left" style={{ padding: '0 32px' }}>
-            <h1 className="hero-headline">
-              Deploy to your VPS<br />
-              using <span className="accent">plain English.</span>
-            </h1>
-            <p className="hero-sub">
-              Stop configuring Docker, Nginx, SSL, and CI/CD by hand.
-              Describe what you want — Ship generates the infrastructure
-              and deploys it to your own server.
-            </p>
-            <div className="hero-ctas">
-              <a href="#install" className="btn btn-primary">Install Ship <Icon name="arrow" size={14} /></a>
-              <a href="https://github.com/kodedlabs/ship" className="btn btn-outline">GitHub</a>
-            </div>
-          </div>
-          <div style={{ padding: '0 32px' }}>
+        {/* floating pill shapes */}
+        <ElegantShape delay={0.3} width={560} height={130} rotate={12}
+          gradient="linear-gradient(to right, rgba(197,247,0,0.10), transparent)"
+          style={{ left: '-6%', top: '16%' }} />
+        <ElegantShape delay={0.5} width={420} height={100} rotate={-14}
+          gradient="linear-gradient(to right, rgba(197,247,0,0.07), transparent)"
+          style={{ right: '-3%', top: '60%' }} />
+        <ElegantShape delay={0.4} width={260} height={70} rotate={-7}
+          gradient="linear-gradient(to right, rgba(255,255,255,0.04), transparent)"
+          style={{ left: '4%', bottom: '8%' }} />
+        <ElegantShape delay={0.65} width={180} height={50} rotate={22}
+          gradient="linear-gradient(to right, rgba(197,247,0,0.08), transparent)"
+          style={{ right: '10%', top: '6%' }} />
+        <ElegantShape delay={0.75} width={120} height={36} rotate={-28}
+          gradient="linear-gradient(to right, rgba(255,255,255,0.03), transparent)"
+          style={{ left: '20%', top: '5%' }} />
+
+        <div className="hero-center">
+          <motion.h1
+            className="hero-headline"
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.35, ease: [0.25, 0.4, 0.25, 1] }}
+          >
+            SHIP <span className="accent">IT.</span>
+          </motion.h1>
+          <motion.p
+            className="hero-sub"
+            initial={{ opacity: 0, y: 28 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.52, ease: [0.25, 0.4, 0.25, 1] }}
+          >
+            Describe your deployment. Ship generates the infrastructure and runs it on your own server.
+          </motion.p>
+          <motion.div
+            className="hero-ctas"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, delay: 0.68, ease: [0.25, 0.4, 0.25, 1] }}
+          >
+            <a href="#install" className="btn btn-primary">Get Ship <Icon name="arrow" size={14} /></a>
+            <a href="https://github.com/Koded0214h/ship-it" className="btn btn-outline">GitHub</a>
+          </motion.div>
+          <motion.div
+            className="hero-terminal"
+            initial={{ opacity: 0, y: 36 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1.1, delay: 0.82, ease: [0.25, 0.4, 0.25, 1] }}
+          >
             <Terminal />
-            <p style={{ fontSize: '0.72rem', color: 'var(--text-3)', marginTop: 10, fontFamily: 'var(--mono)' }}>
+            <p style={{ fontSize: '0.7rem', color: 'var(--text-3)', marginTop: 10, fontFamily: 'var(--mono)', textAlign: 'center' }}>
               click the terminal to try it yourself
             </p>
-          </div>
+          </motion.div>
         </div>
       </section>
 
@@ -564,7 +616,7 @@ export default function App() {
                 No cloud account, no dashboard, no lock-in.
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 28 }}>
-                <a href="https://github.com/kodedlabs/ship" className="btn btn-primary">View on GitHub <Icon name="arrow" size={14} /></a>
+                <a href="https://github.com/Koded0214h/ship-it" className="btn btn-primary">View on GitHub <Icon name="arrow" size={14} /></a>
               </div>
             </div>
             <div className="install-cmds">
@@ -587,7 +639,7 @@ export default function App() {
       </section>
 
       {/* ── Roadmap ── */}
-      <section id="roadmap">
+      <section id="roadmap" className="content-panel">
         <div className="wrap">
           <span className="eyebrow">Roadmap</span>
           <h2 data-scramble="Where Ship is headed.">Where Ship is headed.</h2>
@@ -624,7 +676,7 @@ export default function App() {
         <div className="footer-inner">
           <div className="footer-logo"><span>$</span> ship v0.1.0 · MIT License</div>
           <div className="footer-links">
-            <a href="https://github.com/kodedlabs/ship">GitHub</a>
+            <a href="https://github.com/Koded0214h/ship-it">GitHub</a>
             <a href="#roadmap">Roadmap</a>
             <a href="#faq">FAQ</a>
           </div>
