@@ -79,12 +79,6 @@ func Validate(cfg *Config) []string {
 	if cfg.Server.User == "" {
 		errs = append(errs, "server.user is required")
 	}
-	if cfg.AI.Provider == "" {
-		errs = append(errs, "ai.provider is required")
-	}
-	if cfg.AI.APIKey == "" {
-		errs = append(errs, "ai.api_key is required")
-	}
 	return errs
 }
 

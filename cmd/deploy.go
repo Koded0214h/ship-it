@@ -15,6 +15,7 @@ import (
 	"github.com/kodedlabs/ship/internal/config"
 	"github.com/kodedlabs/ship/internal/deploy"
 	"github.com/kodedlabs/ship/internal/detector"
+	"github.com/kodedlabs/ship/internal/generator"
 	sshclient "github.com/kodedlabs/ship/internal/ssh"
 	"github.com/kodedlabs/ship/internal/ui"
 	"github.com/spf13/cobra"
@@ -49,39 +50,47 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 
 	printProjectSummary(info)
 
-	// Step 2: Get user's deployment description
+	// Step 2 + 3: Build the deployment plan — deterministically when no key is set,
+	// otherwise via the configured AI provider.
 	fmt.Println()
-	var userPrompt string
-	promptForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewText().
-				Title("Describe your deployment").
-				Description("Tell Ship what you want. E.g: 'Deploy with PostgreSQL and Redis. Enable HTTPS. Deploy on push to main.'").
-				Placeholder("Deploy my app with PostgreSQL, enable HTTPS, and set up CI/CD with GitHub Actions.").
-				Value(&userPrompt).
-				Validate(func(s string) error {
-					if strings.TrimSpace(s) == "" {
-						return fmt.Errorf("please describe your deployment")
-					}
-					return nil
-				}),
-		),
-	)
-	if err := promptForm.Run(); err != nil {
-		return err
-	}
-
-	// Step 3: Generate deployment plan
-	fmt.Println()
-	plan, err := runWithSpinner("Generating deployment plan", func() (*ai.DeploymentPlan, error) {
-		provider, err := ai.New(cfg.AI.Provider, cfg.AI.APIKey, cfg.AI.Model)
+	var plan *ai.DeploymentPlan
+	if cfg.AI.APIKey == "" {
+		plan, err = deterministicPlan(info, cfg)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		return provider.GenerateDeploymentPlan(context.Background(), info, userPrompt)
-	})
-	if err != nil {
-		return fmt.Errorf("generating plan: %w", err)
+	} else {
+		var userPrompt string
+		promptForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewText().
+					Title("Describe your deployment").
+					Description("Tell Ship what you want. E.g: 'Deploy with PostgreSQL and Redis. Enable HTTPS. Deploy on push to main.'").
+					Placeholder("Deploy my app with PostgreSQL, enable HTTPS, and set up CI/CD with GitHub Actions.").
+					Value(&userPrompt).
+					Validate(func(s string) error {
+						if strings.TrimSpace(s) == "" {
+							return fmt.Errorf("please describe your deployment")
+						}
+						return nil
+					}),
+			),
+		)
+		if err := promptForm.Run(); err != nil {
+			return err
+		}
+
+		fmt.Println()
+		plan, err = runWithSpinner("Generating deployment plan", func() (*ai.DeploymentPlan, error) {
+			provider, err := ai.New(cfg.AI.Provider, cfg.AI.APIKey, cfg.AI.Model)
+			if err != nil {
+				return nil, err
+			}
+			return provider.GenerateDeploymentPlan(context.Background(), info, userPrompt)
+		})
+		if err != nil {
+			return fmt.Errorf("generating plan: %w", err)
+		}
 	}
 
 	// Step 4: Show plan
@@ -170,6 +179,30 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	}
 
 	return nil
+}
+
+func deterministicPlan(info *detector.ProjectInfo, cfg *config.Config) (*ai.DeploymentPlan, error) {
+	domain := cfg.App.Domain
+	var ssl bool
+	form := huh.NewForm(
+		huh.NewGroup(
+			huh.NewInput().
+				Title("Domain (optional)").
+				Description("Leave blank to deploy on your server's IP address.").
+				Placeholder("api.example.com").
+				Value(&domain),
+			huh.NewConfirm().
+				Title("Enable HTTPS?").
+				Value(&ssl),
+		),
+	)
+	if err := form.Run(); err != nil {
+		return nil, err
+	}
+	if domain == "" {
+		ssl = false
+	}
+	return generator.BuildPlan(info, cfg.App.Name, cfg.Server.User, domain, ssl), nil
 }
 
 func printProjectSummary(info *detector.ProjectInfo) {
