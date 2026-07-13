@@ -12,8 +12,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-const skipAI = "skip"
-
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize Ship in your project",
@@ -94,7 +92,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 					huh.NewOption("Claude (Anthropic)", "anthropic"),
 					huh.NewOption("OpenAI", "openai"),
 					huh.NewOption("Google Gemini", "gemini"),
-					huh.NewOption("Skip — deploy without AI", skipAI),
+					huh.NewOption("Skip — deploy without AI", ""),
 				).
 				Value(&aiProvider),
 		),
@@ -103,7 +101,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if aiProvider != skipAI {
+	if aiProvider != "" {
 		keyForm := huh.NewForm(
 			huh.NewGroup(
 				huh.NewInput().

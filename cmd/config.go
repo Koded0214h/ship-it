@@ -79,7 +79,7 @@ func editAI(cfg *config.Config) error {
 					huh.NewOption("Claude (Anthropic)", "anthropic"),
 					huh.NewOption("OpenAI", "openai"),
 					huh.NewOption("Google Gemini", "gemini"),
-					huh.NewOption("None — deploy without AI", "skip"),
+					huh.NewOption("None — deploy without AI", ""),
 				).
 				Value(&cfg.AI.Provider),
 			huh.NewInput().
@@ -97,9 +97,9 @@ func editAI(cfg *config.Config) error {
 	if err != nil {
 		return err
 	}
-	if cfg.AI.Provider == "skip" {
-		cfg.AI.Provider = ""
+	if cfg.AI.Provider == "" {
 		cfg.AI.APIKey = ""
+		cfg.AI.Model = ""
 	}
 	return nil
 }

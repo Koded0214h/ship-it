@@ -70,16 +70,21 @@ func BuildSummary(info *detector.ProjectInfo, domain string, ssl bool) string {
 	} else if domain != "" {
 		target = domain
 	}
-	return fmt.Sprintf("Deploying a %s %s app%s to %s.", info.Language, info.Framework, extras, target)
+	techLabel := info.Language
+	if info.Framework != "" && info.Framework != info.Language {
+		techLabel = info.Language + " " + info.Framework
+	}
+	return fmt.Sprintf("Deploying a %s app%s to %s.", techLabel, extras, target)
 }
 
 func BuildPlan(info *detector.ProjectInfo, appName, serverUser, domain string, ssl bool) *ai.DeploymentPlan {
+	appDir := fmt.Sprintf("$HOME/ship/%s", appName)
 	return &ai.DeploymentPlan{
 		Dockerfile:    Dockerfile(info),
-		DockerCompose: DockerCompose(info, appName, info.Port),
+		DockerCompose: DockerCompose(info, appName, info.Port, ssl),
 		NginxConfig:   NginxConfig(domain, appName, info.Port, ssl),
 		// serverHost (2nd arg) is an unused parameter in GitHubActions; "" matches current behavior.
-		GitHubActions: GitHubActions(appName, "", serverUser, "SHIP_SSH", ""),
+		GitHubActions: GitHubActions(appName, "", serverUser, "SHIP_SSH", appDir),
 		Services:      BuildServices(info),
 		SSLEnabled:    ssl,
 		Domain:        domain,

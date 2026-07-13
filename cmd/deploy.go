@@ -183,26 +183,25 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 
 func deterministicPlan(info *detector.ProjectInfo, cfg *config.Config) (*ai.DeploymentPlan, error) {
 	domain := cfg.App.Domain
-	var ssl bool
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Domain (optional)").
-				Description("Leave blank to deploy on your server's IP address.").
+				Description("Leave blank to deploy on your server's IP address. Deterministic mode deploys over HTTP for now.").
 				Placeholder("api.example.com").
 				Value(&domain),
-			huh.NewConfirm().
-				Title("Enable HTTPS?").
-				Value(&ssl),
 		),
 	)
 	if err := form.Run(); err != nil {
 		return nil, err
 	}
-	if domain == "" {
-		ssl = false
+	if domain != cfg.App.Domain {
+		cfg.App.Domain = domain
+		if err := config.Save(cfg); err != nil {
+			fmt.Println(ui.WarningStyle.Render("Warning: could not save domain to config: " + err.Error()))
+		}
 	}
-	return generator.BuildPlan(info, cfg.App.Name, cfg.Server.User, domain, ssl), nil
+	return generator.BuildPlan(info, cfg.App.Name, cfg.Server.User, domain, false), nil
 }
 
 func printProjectSummary(info *detector.ProjectInfo) {
