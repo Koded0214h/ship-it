@@ -100,6 +100,8 @@ func editAI(cfg *config.Config) error {
 	if cfg.AI.Provider == "" {
 		cfg.AI.APIKey = ""
 		cfg.AI.Model = ""
+	} else if cfg.AI.APIKey == "" {
+		return fmt.Errorf("API key is required when a provider is selected")
 	}
 	return nil
 }

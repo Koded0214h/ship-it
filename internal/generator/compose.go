@@ -24,12 +24,14 @@ func DockerCompose(info *detector.ProjectInfo, appName string, port int, ssl boo
 		sb.WriteString(workerService(info, appName))
 	}
 
-	sb.WriteString("\nvolumes:\n")
-	if info.HasDatabase {
-		sb.WriteString("  postgres_data:\n")
-	}
-	if info.HasRedis {
-		sb.WriteString("  redis_data:\n")
+	if info.HasDatabase || info.HasRedis {
+		sb.WriteString("\nvolumes:\n")
+		if info.HasDatabase {
+			sb.WriteString("  postgres_data:\n")
+		}
+		if info.HasRedis {
+			sb.WriteString("  redis_data:\n")
+		}
 	}
 
 	sb.WriteString("\nnetworks:\n  app:\n    driver: bridge\n")
@@ -46,7 +48,8 @@ func appService(info *detector.ProjectInfo, appName string, port int) string {
     ports:
       - "127.0.0.1:%d:%d"
     env_file:
-      - .env
+      - path: .env
+        required: false
     networks:
       - app%s
     healthcheck:
@@ -77,7 +80,7 @@ func nginxService(ssl bool) string {
       - app
     depends_on:
       app:
-        condition: service_healthy
+        condition: service_started
 `, ports)
 }
 
@@ -150,7 +153,8 @@ func workerService(info *detector.ProjectInfo, appName string) string {
     restart: unless-stopped
     command: %s
     env_file:
-      - .env
+      - path: .env
+        required: false
     networks:
       - app
     depends_on:

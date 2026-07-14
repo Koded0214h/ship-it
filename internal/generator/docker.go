@@ -49,7 +49,7 @@ WORKDIR /app
 
 RUN addgroup --system app && adduser --system --group app
 
-COPY requirements*.txt pyproject.toml Pipfile* ./
+COPY requirements*.txt pyproject.toml* Pipfile* ./
 RUN %s
 
 COPY . .

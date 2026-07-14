@@ -119,6 +119,13 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
+	if cfg.AI.APIKey == "" && plan.Domain != cfg.App.Domain {
+		cfg.App.Domain = plan.Domain
+		if err := config.Save(cfg); err != nil {
+			fmt.Println(ui.WarningStyle.Render("Warning: could not save domain to config: " + err.Error()))
+		}
+	}
+
 	// Step 6: Save GitHub Actions workflow locally
 	if plan.GitHubActions != "" {
 		localPath := ".github/workflows/deploy.yml"
@@ -194,12 +201,6 @@ func deterministicPlan(info *detector.ProjectInfo, cfg *config.Config) (*ai.Depl
 	)
 	if err := form.Run(); err != nil {
 		return nil, err
-	}
-	if domain != cfg.App.Domain {
-		cfg.App.Domain = domain
-		if err := config.Save(cfg); err != nil {
-			fmt.Println(ui.WarningStyle.Render("Warning: could not save domain to config: " + err.Error()))
-		}
 	}
 	return generator.BuildPlan(info, cfg.App.Name, cfg.Server.User, domain, false), nil
 }

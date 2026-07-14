@@ -56,15 +56,17 @@ func Load() (*Config, error) {
 }
 
 func Save(cfg *Config) error {
-	dir := filepath.Join(configDir)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	path, err := findConfigFile()
+	if err != nil {
+		path = filepath.Join(configDir, configFile)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("encoding config: %w", err)
 	}
-	path := filepath.Join(dir, configFile)
 	return os.WriteFile(path, data, 0600)
 }
 
