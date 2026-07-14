@@ -124,7 +124,7 @@ func goDockerfile(info *detector.ProjectInfo) string {
 	return fmt.Sprintf(`FROM golang:1.23-alpine AS builder
 
 WORKDIR /app
-COPY go.mod go.sum ./
+COPY go.mod go.sum* ./
 RUN go mod download
 
 COPY . .
@@ -158,7 +158,7 @@ RUN apt-get update && apt-get install -y build-essential libpq-dev && rm -rf /va
 
 RUN addgroup --system app && adduser --system --group app
 
-COPY Gemfile Gemfile.lock ./
+COPY Gemfile Gemfile.lock* ./
 RUN bundle install --without development test
 
 COPY . .
@@ -207,7 +207,7 @@ func rustDockerfile(info *detector.ProjectInfo) string {
 
 RUN apk add --no-cache musl-dev
 WORKDIR /app
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml Cargo.lock* ./
 RUN mkdir src && echo "fn main() {}" > src/main.rs && cargo build --release && rm src/main.rs
 
 COPY src ./src
@@ -235,7 +235,7 @@ RUN apk add --no-cache nginx supervisor && \
     docker-php-ext-install pdo pdo_pgsql opcache
 
 WORKDIR /var/www/html
-COPY composer.json composer.lock ./
+COPY composer.json composer.lock* ./
 RUN php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');" && \
     php composer-setup.php --install-dir=/usr/local/bin --filename=composer && \
     composer install --no-dev --optimize-autoloader

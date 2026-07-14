@@ -70,6 +70,17 @@ func Save(cfg *Config) error {
 	return os.WriteFile(path, data, 0600)
 }
 
+func SaveNew(cfg *Config) error {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return fmt.Errorf("creating config dir: %w", err)
+	}
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("encoding config: %w", err)
+	}
+	return os.WriteFile(filepath.Join(configDir, configFile), data, 0600)
+}
+
 func Validate(cfg *Config) []string {
 	var errs []string
 	if cfg.App.Name == "" {

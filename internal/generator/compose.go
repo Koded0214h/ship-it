@@ -48,8 +48,7 @@ func appService(info *detector.ProjectInfo, appName string, port int) string {
     ports:
       - "127.0.0.1:%d:%d"
     env_file:
-      - path: .env
-        required: false
+      - .env
     networks:
       - app%s
     healthcheck:
@@ -153,8 +152,7 @@ func workerService(info *detector.ProjectInfo, appName string) string {
     restart: unless-stopped
     command: %s
     env_file:
-      - path: .env
-        required: false
+      - .env
     networks:
       - app
     depends_on:

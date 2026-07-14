@@ -125,7 +125,7 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	cfg.App.Port = 8080
 
-	if err := config.Save(cfg); err != nil {
+	if err := config.SaveNew(cfg); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
