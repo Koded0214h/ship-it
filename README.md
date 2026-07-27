@@ -144,6 +144,16 @@ ship logs
 
 ---
 
+## Deploying without an AI key
+
+An AI provider is optional. If you don't have (or don't want to use) an API key, choose **"Skip — deploy without AI"** during `ship init`, or clear the provider later by selecting **"None — deploy without AI"** in `ship config`. With no key configured, Ship falls back to built-in templates.
+
+The no-key path produces the exact same artifacts as the AI path — Dockerfile, `docker-compose.yml`, Nginx config, and a GitHub Actions workflow — generated from your detected framework and dependencies instead of a written description. Instead of one freeform sentence, Ship asks two direct questions: your domain (optional) and whether to enable HTTPS.
+
+> **HTTPS note:** Enabling HTTPS configures Nginx to expect a TLS certificate, but nothing provisions one automatically yet — you'll need to issue a certificate (e.g. via certbot) on the server yourself. This is true for both the AI and no-key paths today, not something specific to deterministic mode.
+
+---
+
 ## Supported Frameworks (MVP)
 
 Backend

@@ -111,9 +111,6 @@ func (e *Executor) uploadNginxConfig() error {
 }
 
 func (e *Executor) uploadEnvTemplate() error {
-	if len(e.plan.EnvVars) == 0 {
-		return nil
-	}
 	// Only write .env if one doesn't already exist on the server
 	remotePath := fmt.Sprintf("%s/.env", e.appDir)
 	out, _, _ := e.client.Exec(fmt.Sprintf("test -f %s && echo exists", remotePath))

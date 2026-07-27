@@ -56,16 +56,29 @@ func Load() (*Config, error) {
 }
 
 func Save(cfg *Config) error {
-	dir := filepath.Join(configDir)
-	if err := os.MkdirAll(dir, 0700); err != nil {
+	path, err := findConfigFile()
+	if err != nil {
+		path = filepath.Join(configDir, configFile)
+	}
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		return fmt.Errorf("creating config dir: %w", err)
 	}
 	data, err := yaml.Marshal(cfg)
 	if err != nil {
 		return fmt.Errorf("encoding config: %w", err)
 	}
-	path := filepath.Join(dir, configFile)
 	return os.WriteFile(path, data, 0600)
+}
+
+func SaveNew(cfg *Config) error {
+	if err := os.MkdirAll(configDir, 0700); err != nil {
+		return fmt.Errorf("creating config dir: %w", err)
+	}
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("encoding config: %w", err)
+	}
+	return os.WriteFile(filepath.Join(configDir, configFile), data, 0600)
 }
 
 func Validate(cfg *Config) []string {
@@ -78,12 +91,6 @@ func Validate(cfg *Config) []string {
 	}
 	if cfg.Server.User == "" {
 		errs = append(errs, "server.user is required")
-	}
-	if cfg.AI.Provider == "" {
-		errs = append(errs, "ai.provider is required")
-	}
-	if cfg.AI.APIKey == "" {
-		errs = append(errs, "ai.api_key is required")
 	}
 	return errs
 }

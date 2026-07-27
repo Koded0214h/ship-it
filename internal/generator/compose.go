@@ -7,11 +7,12 @@ import (
 	"github.com/kodedlabs/ship/internal/detector"
 )
 
-func DockerCompose(info *detector.ProjectInfo, appName string, port int) string {
+func DockerCompose(info *detector.ProjectInfo, appName string, port int, ssl bool) string {
 	var sb strings.Builder
 
 	sb.WriteString("services:\n")
 	sb.WriteString(appService(info, appName, port))
+	sb.WriteString(nginxService(ssl))
 
 	if info.HasDatabase {
 		sb.WriteString(postgresService())
@@ -23,12 +24,14 @@ func DockerCompose(info *detector.ProjectInfo, appName string, port int) string 
 		sb.WriteString(workerService(info, appName))
 	}
 
-	sb.WriteString("\nvolumes:\n")
-	if info.HasDatabase {
-		sb.WriteString("  postgres_data:\n")
-	}
-	if info.HasRedis {
-		sb.WriteString("  redis_data:\n")
+	if info.HasDatabase || info.HasRedis {
+		sb.WriteString("\nvolumes:\n")
+		if info.HasDatabase {
+			sb.WriteString("  postgres_data:\n")
+		}
+		if info.HasRedis {
+			sb.WriteString("  redis_data:\n")
+		}
 	}
 
 	sb.WriteString("\nnetworks:\n  app:\n    driver: bridge\n")
@@ -55,6 +58,29 @@ func appService(info *detector.ProjectInfo, appName string, port int) string {
       retries: 3
       start_period: 40s
 `, appName, port, port, depends, port)
+}
+
+func nginxService(ssl bool) string {
+	ports := `      - "80:80"`
+	if ssl {
+		ports += `
+      - "443:443"`
+	}
+	return fmt.Sprintf(`
+  nginx:
+    image: nginx:alpine
+    container_name: nginx
+    restart: unless-stopped
+    ports:
+%s
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - app
+    depends_on:
+      app:
+        condition: service_started
+`, ports)
 }
 
 func dependsOn(info *detector.ProjectInfo) string {

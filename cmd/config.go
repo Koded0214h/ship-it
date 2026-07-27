@@ -71,7 +71,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 }
 
 func editAI(cfg *config.Config) error {
-	return huh.NewForm(
+	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("AI provider").
@@ -79,19 +79,14 @@ func editAI(cfg *config.Config) error {
 					huh.NewOption("Claude (Anthropic)", "anthropic"),
 					huh.NewOption("OpenAI", "openai"),
 					huh.NewOption("Google Gemini", "gemini"),
+					huh.NewOption("None — deploy without AI", ""),
 				).
 				Value(&cfg.AI.Provider),
 			huh.NewInput().
 				Title("API key").
-				Description("Your API key for the selected provider").
+				Description("Leave blank if you selected 'None' above").
 				EchoMode(huh.EchoModePassword).
-				Value(&cfg.AI.APIKey).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("API key is required")
-					}
-					return nil
-				}),
+				Value(&cfg.AI.APIKey),
 			huh.NewInput().
 				Title("Model").
 				Description("Leave blank to use the default model for the provider").
@@ -99,6 +94,16 @@ func editAI(cfg *config.Config) error {
 				Value(&cfg.AI.Model),
 		),
 	).Run()
+	if err != nil {
+		return err
+	}
+	if cfg.AI.Provider == "" {
+		cfg.AI.APIKey = ""
+		cfg.AI.Model = ""
+	} else if cfg.AI.APIKey == "" {
+		return fmt.Errorf("API key is required when a provider is selected")
+	}
+	return nil
 }
 
 func editApp(cfg *config.Config) error {
