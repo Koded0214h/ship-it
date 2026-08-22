@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
 import './index.css'
 
@@ -269,6 +269,7 @@ function Terminal() {
   const inputRef = useRef(null)
   const bodyRef  = useRef(null)
   const timerRef = useRef(null)
+  const [runTick, setRunTick] = useState(0)
 
   const scroll = () => { if (bodyRef.current) bodyRef.current.scrollTop = 9999 }
 
@@ -281,12 +282,17 @@ function Terminal() {
 
   useEffect(() => { scroll() }, [lines, typing, spinner, userInput])
 
-  const run = useCallback(() => {
+  // Start and manage the auto terminal sequence. Incrementing `runTick`
+  // restarts the sequence (used by the "click to restart demo" UI).
+  const run = () => setRunTick(t => t + 1)
+
+  useEffect(() => {
     let step = 0
-    setLines([]); setTyping(null); setSpinner(null)
+    const timers = []
+    timers.push(setTimeout(() => { setLines([]); setTyping(null); setSpinner(null) }, 0))
 
     const next = () => {
-      if (step >= AUTO_SEQ.length) { timerRef.current = setTimeout(run, 3000); return }
+      if (step >= AUTO_SEQ.length) { timerRef.current = setTimeout(next, 3000); step = 0; return }
       const item = AUTO_SEQ[step++]
 
       if (item.k === 'blank') {
@@ -322,13 +328,11 @@ function Terminal() {
       setLines(l => [...l, { ...item, id: Math.random() }])
       timerRef.current = setTimeout(next, { ok: 140, muted: 280, label: 180, url: 0 }[item.k] ?? 180)
     }
-    timerRef.current = setTimeout(next, 300)
-  }, [])
 
-  useEffect(() => {
-    run()
-    return () => clearTimeout(timerRef.current)
-  }, [run])
+    timerRef.current = setTimeout(next, 300)
+    timers.push(timerRef.current)
+    return () => timers.forEach(clearTimeout)
+  }, [runTick])
 
   // Interactive mode
   const enterInteractive = () => {
@@ -513,10 +517,12 @@ function HowItWorks() {
   const [visLines, setVisLines] = useState([])
 
   useEffect(() => {
-    setVisLines([])
+    const timers = []
+    timers.push(setTimeout(() => setVisLines([]), 0))
     FLOW_NODES[active].lines.forEach((l, i) => {
-      setTimeout(() => setVisLines(v => [...v, l]), i * 80)
+      timers.push(setTimeout(() => setVisLines(v => [...v, l]), i * 80 + 16))
     })
+    return () => timers.forEach(clearTimeout)
   }, [active])
 
   return (
