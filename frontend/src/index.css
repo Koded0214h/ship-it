@@ -518,10 +518,20 @@ nav.solid .dock {
   padding: 12px 16px;
   font-family: var(--mono); font-size: 0.82rem;
   gap: 12px;
+  max-width: 100%;
   transition: border-color 0.2s;
 }
 .install-cmd:hover { border-color: var(--border-2); }
-.install-cmd .cmd { color: var(--accent); flex: 1; }
+.install-cmd .cmd {
+  color: var(--accent);
+  flex: 1;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: none;
+}
+.install-cmd .cmd::-webkit-scrollbar { display: none; }
+.install-cmd .copy-btn { flex-shrink: 0; }
 .copy-btn {
   font-family: var(--mono); font-size: 0.7rem;
   background: var(--bg-2); border: 1px solid var(--border-2);
@@ -780,6 +790,8 @@ footer {
 
   /* install */
   .install-grid { grid-template-columns: 1fr; gap: 36px; }
+  .install-cmd { font-size: 0.74rem; padding: 10px 12px; gap: 8px; }
+  .copy-btn { padding: 4px 8px; font-size: 0.65rem; }
 
   /* roadmap */
   .roadmap-grid { grid-template-columns: 1fr; }

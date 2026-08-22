@@ -1,0 +1,44 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you run, what did you expect, what actually happened?
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ship init
+        2. ship deploy
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Paste any relevant CLI output. Redact secrets, hostnames, and API keys.
+      render: shell
+
+  - type: input
+    id: version
+    attributes:
+      label: ship --version
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: OS / arch
+      placeholder: e.g. macOS 15 arm64, Ubuntu 22.04 amd64
+    validations:
+      required: true

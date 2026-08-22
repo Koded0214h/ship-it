@@ -9,6 +9,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -309,7 +310,7 @@ func (c *Client) GetServerInfo() ServerInfo {
 
 // IsPortOpen checks if a TCP port is accepting connections.
 func IsPortOpen(host string, port int) bool {
-	addr := fmt.Sprintf("%s:%d", host, port)
+	addr := net.JoinHostPort(host, strconv.Itoa(port))
 	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
 	if err != nil {
 		return false

@@ -1,7 +1,7 @@
 #!/bin/sh
 set -e
 
-REPO="Koded0214h/ship-it"
+REPO="kodedlabs/ship"
 BINARY="ship"
 INSTALL_DIR="/usr/local/bin"
 

@@ -1,4 +1,11 @@
 .vscode/
+.DS_Store
 
 # Ship deployment config (contains secrets)
 .ship/
+
+# Local build output
+/ship
+
+# goreleaser output (regenerated on release)
+/dist/

@@ -2,6 +2,8 @@
 
 > Deploy your applications to your own VPS using simple, natural language.
 
+📚 [Docs](docs/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
+
 Ship is an AI-powered CLI that eliminates the complexity of configuring deployments, Docker, reverse proxies, SSL, and CI/CD pipelines.
 
 Instead of spending hours writing Dockerfiles, GitHub Actions workflows, Nginx configurations, and deployment scripts, simply describe what you want.
@@ -90,22 +92,22 @@ The AI helps create the deployment plan, while the CLI performs all server opera
 
 ## Installation
 
-Coming soon.
+**Homebrew** (macOS/Linux)
 
 ```bash
-brew install ship
+brew install kodedlabs/tap/ship
 ```
 
-or
+**Install script** (macOS/Linux)
 
 ```bash
-npm install -g ship-cli
+curl -fsSL https://raw.githubusercontent.com/kodedlabs/ship/main/install.sh | sh
 ```
 
-or
+**Go install**
 
 ```bash
-curl -fsSL https://shipcli.dev/install.sh | bash
+go install github.com/kodedlabs/ship@latest
 ```
 
 ---
@@ -148,22 +150,18 @@ ship logs
 
 Backend
 
-* Backend is meant to be framework agnostic, so it doesnt matter
-
-Frontend
-
-* we only host servers, backend you get..
-* we'll have a frontend for cool landing page and setup or docs..?
+* Framework agnostic — Ship detects your stack and generates configs to match, rather than requiring a specific framework.
 
 Infrastructure
 
 * Docker
 * Docker Compose
 * PostgreSQL
-* and any other thats needed
 * Redis
 * GitHub Actions
 * Ubuntu VPS
+
+Ship deploys server-side applications to a VPS you own; it doesn't host anything itself. See [Roadmap](#roadmap) for what's planned next.
 
 ---
 
@@ -234,17 +232,21 @@ If you've ever thought:
 
 ...you're exactly who Ship is for.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for dev setup and how to submit changes, and [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) for community guidelines. Security issues should go through [SECURITY.md](SECURITY.md) instead of a public issue.
+
 ---
 
 ## License
 
-MIT
+MIT — see [LICENSE](LICENSE).
 
+---
 
-## for colors and text stuff
-cobra               → CLI framework
-lipgloss            → Colors & styling
-bubbles             → Interactive components
-bubbletea           → Terminal UI (optional)
-huh                 → Beautiful prompts/forms
-glamour             → Render Markdown beautifully
+## Built With
+
+* [cobra](https://github.com/spf13/cobra) — CLI framework
+* [lipgloss](https://github.com/charmbracelet/lipgloss) — colors & styling
+* [bubbles](https://github.com/charmbracelet/bubbles) — interactive components
+* [bubbletea](https://github.com/charmbracelet/bubbletea) — terminal UI
+* [huh](https://github.com/charmbracelet/huh) — prompts & forms
+* [glamour](https://github.com/charmbracelet/glamour) — Markdown rendering

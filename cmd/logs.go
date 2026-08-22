@@ -33,7 +33,7 @@ func runLogs(cmd *cobra.Command, args []string) error {
 	}
 	defer client.Close()
 
-	appDir := fmt.Sprintf("/opt/ship/%s", cfg.App.Name)
+	appDir := fmt.Sprintf("$HOME/ship/%s", cfg.App.Name)
 	logCmd := fmt.Sprintf("cd %s && docker compose logs -f --tail=100", appDir)
 
 	fmt.Println(ui.MutedStyle.Render("Streaming logs from " + cfg.Server.Host + " (Ctrl+C to stop)"))
