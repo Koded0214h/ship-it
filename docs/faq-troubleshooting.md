@@ -35,4 +35,4 @@ The health check does a plain HTTP GET to your domain (or the server's IP if you
 
 See [Architecture](architecture.md#where-credentials-go) for more.
 
-Didn't find your issue here? Open a [GitHub issue](https://github.com/kodedlabs/ship/issues) — see [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) for what to include.
+Didn't find your issue here? Open a [GitHub issue](https://github.com/Koded0214h/ship/issues) — see [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) for what to include.

@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/kodedlabs/ship/internal/ai"
-	"github.com/kodedlabs/ship/internal/config"
-	"github.com/kodedlabs/ship/internal/generator"
-	sshclient "github.com/kodedlabs/ship/internal/ssh"
+	"github.com/Koded0214h/ship/internal/ai"
+	"github.com/Koded0214h/ship/internal/config"
+	"github.com/Koded0214h/ship/internal/generator"
+	sshclient "github.com/Koded0214h/ship/internal/ssh"
 )
 
 type Executor struct {

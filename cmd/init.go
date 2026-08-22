@@ -6,9 +6,9 @@ import (
 
 	"github.com/charmbracelet/huh"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/kodedlabs/ship/internal/config"
-	"github.com/kodedlabs/ship/internal/sshkey"
-	"github.com/kodedlabs/ship/internal/ui"
+	"github.com/Koded0214h/ship/internal/config"
+	"github.com/Koded0214h/ship/internal/sshkey"
+	"github.com/Koded0214h/ship/internal/ui"
 	"github.com/spf13/cobra"
 )
 

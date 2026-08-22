@@ -1,4 +1,4 @@
-module github.com/kodedlabs/ship
+module github.com/Koded0214h/ship
 
 go 1.26.1
 

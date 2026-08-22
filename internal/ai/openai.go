@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/kodedlabs/ship/internal/detector"
+	"github.com/Koded0214h/ship/internal/detector"
 	openai "github.com/sashabaranov/go-openai"
 )
 

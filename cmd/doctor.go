@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/kodedlabs/ship/internal/ai"
-	"github.com/kodedlabs/ship/internal/config"
-	sshclient "github.com/kodedlabs/ship/internal/ssh"
-	"github.com/kodedlabs/ship/internal/ui"
+	"github.com/Koded0214h/ship/internal/ai"
+	"github.com/Koded0214h/ship/internal/config"
+	sshclient "github.com/Koded0214h/ship/internal/ssh"
+	"github.com/Koded0214h/ship/internal/ui"
 	"github.com/spf13/cobra"
 )
 

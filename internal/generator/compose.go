@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/kodedlabs/ship/internal/detector"
+	"github.com/Koded0214h/ship/internal/detector"
 )
 
 func DockerCompose(info *detector.ProjectInfo, appName string, port int) string {

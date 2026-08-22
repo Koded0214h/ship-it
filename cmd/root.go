@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/kodedlabs/ship/internal/ui"
+	"github.com/Koded0214h/ship/internal/ui"
 	"github.com/spf13/cobra"
 )
 

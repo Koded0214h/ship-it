@@ -1,6 +1,6 @@
 package main
 
-import "github.com/kodedlabs/ship/cmd"
+import "github.com/Koded0214h/ship/cmd"
 
 func main() {
 	cmd.Execute()

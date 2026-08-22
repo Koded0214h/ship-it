@@ -95,19 +95,19 @@ The AI helps create the deployment plan, while the CLI performs all server opera
 **Homebrew** (macOS/Linux)
 
 ```bash
-brew install kodedlabs/tap/ship
+brew install Koded0214h/tap/ship
 ```
 
 **Install script** (macOS/Linux)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/kodedlabs/ship/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Koded0214h/ship/main/install.sh | sh
 ```
 
 **Go install**
 
 ```bash
-go install github.com/kodedlabs/ship@latest
+go install github.com/Koded0214h/ship@latest
 ```
 
 ---
@@ -184,31 +184,33 @@ Ship simply removes the repetitive DevOps work.
 
 ## Roadmap
 
-### MVP
+### MVP — shipped
 
-* [ ] Project detection
-* [ ] SSH connections
-* [ ] Docker generation
-* [ ] Docker Compose generation
-* [ ] GitHub Actions generation
-* [ ] Nginx configuration
-* [ ] HTTPS setup
-* [ ] Deployment execution
+* [x] Project detection
+* [x] SSH connections
+* [x] Docker generation
+* [x] Docker Compose generation
+* [x] GitHub Actions generation
+* [x] Nginx configuration
+* [x] HTTPS setup
+* [x] Deployment execution
 
 ### v0.2
 
-* [ ] Rollbacks
-* [ ] Deployment history
-* [ ] Interactive deployment plans
-* [ ] Environment variable management
+* [ ] [Rollbacks](https://github.com/Koded0214h/ship/issues/2)
+* [ ] [Deployment history](https://github.com/Koded0214h/ship/issues/3)
+* [ ] [Interactive deployment plan editing](https://github.com/Koded0214h/ship/issues/4)
+* [ ] [Environment variable management](https://github.com/Koded0214h/ship/issues/5)
 
 ### v0.3
 
-* [ ] Monitoring
-* [ ] Automatic backups
-* [ ] Multi-server deployments
-* [ ] Background workers
-* [ ] Cron jobs
+* [ ] [Monitoring integrations](https://github.com/Koded0214h/ship/issues/6)
+* [ ] [Automatic backups](https://github.com/Koded0214h/ship/issues/7)
+* [ ] [Multi-server deployments](https://github.com/Koded0214h/ship/issues/8)
+* [ ] [Background workers & cron jobs](https://github.com/Koded0214h/ship/issues/9)
+* [ ] [Plugin system](https://github.com/Koded0214h/ship/issues/10)
+
+See the [open issues](https://github.com/Koded0214h/ship/issues) for the full backlog, including smaller bugs and cleanup tasks.
 
 ---
 

@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/kodedlabs/ship/internal/detector"
+	"github.com/Koded0214h/ship/internal/detector"
 )
 
 type DeploymentPlan struct {

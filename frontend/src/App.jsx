@@ -637,7 +637,7 @@ export default function App() {
           <a href="#features" className="dock-item"><Icon name="scan" size={13} />Features</a>
           <a href="#how" className="dock-item"><Icon name="term" size={13} />How it works</a>
           <a href="#roadmap" className="dock-item"><Icon name="pulse" size={13} />Roadmap</a>
-          <a href="https://github.com/kodedlabs/ship" className="dock-item"><Icon name="git" size={13} />GitHub</a>
+          <a href="https://github.com/Koded0214h/ship" className="dock-item"><Icon name="git" size={13} />GitHub</a>
           <div className="dock-sep" />
           <a href="#install" className="dock-cta">Install <Icon name="arrow" size={12} /></a>
         </div>
@@ -686,7 +686,7 @@ export default function App() {
             transition={{ duration: 1, delay: 0.68, ease: [0.25, 0.4, 0.25, 1] }}
           >
             <a href="#install" className="btn btn-primary">Start Shipping <Icon name="arrow" size={14} /></a>
-            <a href="https://github.com/kodedlabs/ship" className="btn btn-outline">GitHub</a>
+            <a href="https://github.com/Koded0214h/ship" className="btn btn-outline">GitHub</a>
           </motion.div>
           <motion.div
             className="hero-terminal"
@@ -719,14 +719,14 @@ export default function App() {
                 No cloud account, no dashboard, no lock-in.
               </p>
               <div style={{ display: 'flex', gap: 10, marginTop: 28 }}>
-                <a href="https://github.com/kodedlabs/ship" className="btn btn-primary">View on GitHub <Icon name="arrow" size={14} /></a>
+                <a href="https://github.com/Koded0214h/ship" className="btn btn-primary">View on GitHub <Icon name="arrow" size={14} /></a>
               </div>
             </div>
             <div className="install-cmds">
               {[
-                { label: 'Homebrew',   cmd: 'brew install kodedlabs/tap/ship' },
-                { label: 'curl',       cmd: 'curl -fsSL https://raw.githubusercontent.com/kodedlabs/ship/main/install.sh | sh' },
-                { label: 'go install', cmd: 'go install github.com/kodedlabs/ship@latest' },
+                { label: 'Homebrew',   cmd: 'brew install Koded0214h/tap/ship' },
+                { label: 'curl',       cmd: 'curl -fsSL https://raw.githubusercontent.com/Koded0214h/ship/main/install.sh | sh' },
+                { label: 'go install', cmd: 'go install github.com/Koded0214h/ship@latest' },
               ].map(({ label, cmd }) => (
                 <div key={label}>
                   <div style={{ fontFamily: 'var(--mono)', fontSize: '0.68rem', color: 'var(--text-3)', marginBottom: 5, letterSpacing: '0.08em', textTransform: 'uppercase' }}>{label}</div>
@@ -779,7 +779,7 @@ export default function App() {
         <div className="footer-inner">
           <div className="footer-logo"><span>$</span> ship v0.1.0 · MIT License</div>
           <div className="footer-links">
-            <a href="https://github.com/kodedlabs/ship">GitHub</a>
+            <a href="https://github.com/Koded0214h/ship">GitHub</a>
             <a href="#roadmap">Roadmap</a>
             <a href="#faq">FAQ</a>
           </div>
