@@ -90,6 +90,9 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	})
 
 	check("AI provider API key", func() (string, error) {
+		if cfg.AI.APIKey == "" {
+			return "skipped — deterministic mode", nil
+		}
 		provider, err := ai.New(cfg.AI.Provider, cfg.AI.APIKey, cfg.AI.Model)
 		if err != nil {
 			return "", err

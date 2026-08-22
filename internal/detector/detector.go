@@ -2,6 +2,7 @@ package detector
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -27,11 +28,14 @@ func Detect(dir string) (*ProjectInfo, error) {
 		return nil, err
 	}
 
+	hasStartScript := false
 	for _, f := range files {
 		name := f.Name()
 		switch name {
 		case ".env", ".env.example", ".env.sample":
 			info.EnvFileExists = true
+		case "start.sh":
+			hasStartScript = true
 		}
 		if isPackageFile(name) {
 			info.PackageFiles = append(info.PackageFiles, name)
@@ -43,6 +47,10 @@ func Detect(dir string) (*ProjectInfo, error) {
 
 	if info.Port == 0 {
 		info.Port = defaultPort(info.Framework)
+	}
+
+	if info.Language == "Unknown" && !hasStartScript {
+		return nil, fmt.Errorf("couldn't detect a supported language, and no start.sh found in %s — add a start.sh that starts your app, or open an issue to request support for your stack", dir)
 	}
 
 	return info, nil

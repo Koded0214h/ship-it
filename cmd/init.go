@@ -87,34 +87,45 @@ func runInit(cmd *cobra.Command, args []string) error {
 		huh.NewGroup(
 			huh.NewSelect[string]().
 				Title("AI provider").
-				Description("Which AI provider should generate your deployment plans?").
+				Description("Which AI provider should generate your deployment plans? Skip if you don't have a key — Ship falls back to built-in templates.").
 				Options(
 					huh.NewOption("Claude (Anthropic)", "anthropic"),
 					huh.NewOption("OpenAI", "openai"),
 					huh.NewOption("Google Gemini", "gemini"),
+					huh.NewOption("Skip — deploy without AI", ""),
 				).
 				Value(&aiProvider),
-			huh.NewInput().
-				Title("AI API key").
-				Description("Your API key for the selected provider").
-				EchoMode(huh.EchoModePassword).
-				Value(&cfg.AI.APIKey).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("API key is required")
-					}
-					return nil
-				}),
 		),
 	)
 	if err := step3.Run(); err != nil {
 		return err
 	}
 
-	cfg.AI.Provider = aiProvider
+	if aiProvider != "" {
+		keyForm := huh.NewForm(
+			huh.NewGroup(
+				huh.NewInput().
+					Title("AI API key").
+					Description("Your API key for the selected provider").
+					EchoMode(huh.EchoModePassword).
+					Value(&cfg.AI.APIKey).
+					Validate(func(s string) error {
+						if s == "" {
+							return fmt.Errorf("API key is required")
+						}
+						return nil
+					}),
+			),
+		)
+		if err := keyForm.Run(); err != nil {
+			return err
+		}
+		cfg.AI.Provider = aiProvider
+	}
+
 	cfg.App.Port = 8080
 
-	if err := config.Save(cfg); err != nil {
+	if err := config.SaveNew(cfg); err != nil {
 		return fmt.Errorf("saving config: %w", err)
 	}
 
