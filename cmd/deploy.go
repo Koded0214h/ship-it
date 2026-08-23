@@ -245,6 +245,7 @@ func renderPlan(plan *ai.DeploymentPlan, cfg *config.Config) error {
 func buildPlanMarkdown(plan *ai.DeploymentPlan, cfg *config.Config) string {
 	var sb strings.Builder
 	sb.WriteString("## Deployment Plan\n\n")
+	sb.WriteString(fmt.Sprintf("Target: %s → %s@%s\n\n", cfg.App.Name, cfg.Server.User, cfg.Server.Host))
 	if plan.Summary != "" {
 		sb.WriteString(plan.Summary + "\n\n")
 	}
