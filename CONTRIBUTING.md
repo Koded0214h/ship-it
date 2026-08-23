@@ -51,13 +51,28 @@ npm run dev
 
 ## Making changes
 
-1. Fork the repo and create a branch off `main`.
+1. Fork the repo and create a branch off `main`, named `<type>/<short-description>` — e.g. `fix/nginx-ssl-fallback`, `feat/shipignore-support`, `docs/config-schema`. Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
 2. Keep PRs focused — one logical change per PR is easier to review than a bundle of unrelated fixes.
 3. Run `go build ./...` and `go vet ./...` before opening a PR. If you touched `frontend/`, run `npm run lint` and `npm run build` there too.
-4. Write a clear PR description: what changed and why, not just what.
-5. Link the issue your PR addresses, if there is one.
+4. Write a clear PR description: what changed and why, not just what. Follow the PR template — it asks for a linked issue, a summary, and how you tested it.
+5. Link the issue your PR addresses. PRs that don't address an open issue (or a clearly-scoped bug you found) may be asked to open one first, so we can agree on direction before reviewing the code.
+6. Open the PR against `main` — direct pushes to `main` aren't allowed, and CI must pass before it can merge.
 
-There isn't a Go test suite yet — if you're adding non-trivial logic (especially in `internal/detector` or `internal/generator`), tests are welcome and appreciated, but not a hard gate today.
+There isn't a Go test suite yet — if you're adding non-trivial logic (especially in `internal/detector` or `internal/generator`), tests are welcome and appreciated, but not a hard gate today. That said, PRs that only add coverage (see issues labeled `testing`) are very welcome.
+
+## Maintainers and merging
+
+Anyone can open a PR. Right now, [@Koded0214h](https://github.com/Koded0214h) is the sole maintainer and the only person who merges to `main`. `main` is protected: no direct pushes, PRs required, CI must pass before merge.
+
+A PR is expected to be rejected or sent back for changes if it:
+
+- doesn't address an open issue (open one first for anything non-trivial),
+- lacks tests for new non-trivial logic where tests are reasonably expected,
+- introduces a breaking change without prior discussion in an issue,
+- is poorly documented (unclear PR description, no comments on non-obvious logic),
+- bundles unrelated changes together.
+
+**Becoming a maintainer:** there's no formal process yet, given the project's size — it'll happen organically as contributors show sustained, trustworthy involvement (multiple merged PRs, thoughtful issue triage/review). If you're interested, say so in an issue or PR discussion.
 
 ## Where to focus
 

@@ -96,18 +96,22 @@ func (e *Executor) uploadDockerCompose() error {
 }
 
 func (e *Executor) uploadNginxConfig() error {
-	nginxCfg := e.plan.NginxConfig
-
-	// When there's no domain, the AI often generates an HTTP→HTTPS redirect that
-	// breaks plain-IP access. Override with a known-good HTTP-only config instead.
-	if e.plan.Domain == "" || !e.plan.SSLEnabled {
-		nginxCfg = generator.NginxConfig("", e.cfg.App.Name, e.appPort, false)
-	}
-
+	nginxCfg := selectNginxConfig(e.plan, e.cfg.App.Name, e.appPort)
 	if nginxCfg == "" {
 		return nil
 	}
 	return e.client.WriteFile(fmt.Sprintf("%s/nginx.conf", e.appDir), nginxCfg)
+}
+
+// selectNginxConfig decides which nginx config to ship for this deploy.
+//
+// When there's no domain, the AI often generates an HTTP→HTTPS redirect that
+// breaks plain-IP access. Override with a known-good HTTP-only config instead.
+func selectNginxConfig(plan *ai.DeploymentPlan, appName string, appPort int) string {
+	if plan.Domain == "" || !plan.SSLEnabled {
+		return generator.NginxConfig(plan.Domain, appName, appPort, false)
+	}
+	return plan.NginxConfig
 }
 
 func (e *Executor) uploadEnvTemplate() error {
@@ -153,19 +157,25 @@ func (e *Executor) startContainers() error {
 	return fmt.Errorf("containers did not start within 3 minutes\n\nBuild log:\n%s", tail)
 }
 
-func (e *Executor) healthCheck() error {
-	host := e.cfg.Server.Host
-	hasDomain := e.plan.Domain != ""
+// healthCheckURL picks the host/scheme to probe: the domain over HTTPS when
+// SSL is enabled and a domain is configured, the server's IP over plain HTTP
+// otherwise — an IP address can't hold a TLS cert.
+func healthCheckURL(serverHost string, plan *ai.DeploymentPlan) string {
+	host := serverHost
+	hasDomain := plan.Domain != ""
 	if hasDomain {
-		host = e.plan.Domain
+		host = plan.Domain
 	}
 
-	// Only use HTTPS when there's a real domain — IP addresses can't have certs
 	scheme := "http"
-	if e.plan.SSLEnabled && hasDomain {
+	if plan.SSLEnabled && hasDomain {
 		scheme = "https"
 	}
-	url := fmt.Sprintf("%s://%s", scheme, host)
+	return fmt.Sprintf("%s://%s", scheme, host)
+}
+
+func (e *Executor) healthCheck() error {
+	url := healthCheckURL(e.cfg.Server.Host, e.plan)
 
 	// Don't follow redirects — a 3xx from nginx counts as "app is up"
 	client := &http.Client{
