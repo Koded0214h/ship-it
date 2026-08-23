@@ -1,0 +1,25 @@
+name: Documentation issue
+description: Missing, unclear, or incorrect documentation
+labels: ["documentation"]
+body:
+  - type: input
+    id: location
+    attributes:
+      label: Where?
+      description: File/URL/section — e.g. docs/configuration.md, README.md Quickstart, --help output of a specific command
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's wrong or missing?
+      description: Be specific — "unclear" is harder to act on than "step 3 assumes X but never says how to get X"
+    validations:
+      required: true
+
+  - type: textarea
+    id: suggestion
+    attributes:
+      label: Suggested fix
+      description: What should it say instead? Optional, but helpful.
