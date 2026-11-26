@@ -4,20 +4,23 @@
 
 📚 [Docs](docs/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
-Ship is an AI-powered CLI that eliminates the complexity of configuring deployments, Docker, reverse proxies, SSL, and CI/CD pipelines.
+> ⚠️ **Alpha software. Use a disposable or dedicated server, not one you care about.**
+> The released `v0.1.0` binary stops and removes **every** container on the server during a deploy, uploads your local `.env` over the server's, does not verify SSH host keys, and can report success when the build failed. These are being fixed on `main` and are not yet released.
 
-Instead of spending hours writing Dockerfiles, GitHub Actions workflows, Nginx configurations, and deployment scripts, simply describe what you want.
+Ship is a CLI that deploys your application to your own VPS with Docker Compose and Nginx. It can use an AI provider to plan the deployment, or built-in templates with no AI at all.
+
+Instead of spending hours writing Dockerfiles, Nginx configurations, and deployment scripts, simply describe what you want.
 
 ```bash
 ship deploy
 
 > Deploy my Django app with PostgreSQL and Redis.
 > Use Docker.
-> Deploy automatically when I push to main.
-> Enable HTTPS.
 ```
 
-Ship generates the deployment plan, configures your server, and gets your application online—all while you keep full ownership of your infrastructure.
+Ship generates the deployment plan, shows you the files, and builds and starts your application on a server that already has Docker—all while you keep full ownership of your infrastructure.
+
+**Not supported yet:** HTTPS/SSL, CI/CD generation, installing Docker for you, rollbacks, and more than one app per server.
 
 ---
 
@@ -49,12 +52,12 @@ Ship aims to make deployment conversational.
 
 * 🤖 AI-assisted deployment planning
 * 🐳 Automatic Docker & Docker Compose generation
-* 🔒 HTTPS & SSL configuration
-* 🚀 GitHub Actions CI/CD generation
 * 🔍 Automatic project detection
 * 🖥️ SSH-based VPS deployments
 * 📋 Deployment summaries
 * 🛠️ Health checks & diagnostics
+* 🔒 HTTPS (planned)
+* 🚀 CI/CD generation (planned)
 * 🔄 Rollback support (planned)
 * 📈 Monitoring integrations (planned)
 
@@ -110,6 +113,8 @@ curl -fsSL https://raw.githubusercontent.com/Koded0214h/ship/main/install.sh | s
 go install github.com/Koded0214h/ship@latest
 ```
 
+> `go install` fails with `v0.1.0` (module path mismatch) and will work from the next release. Homebrew and the install script currently provide `v0.1.0`, which requires an AI key.
+
 ---
 
 ## Quick Start
@@ -148,11 +153,9 @@ ship logs
 
 ## Deploying without an AI key
 
-An AI provider is optional. If you don't have (or don't want to use) an API key, choose **"Skip — deploy without AI"** during `ship init`, or clear the provider later by selecting **"None — deploy without AI"** in `ship config`. With no key configured, Ship falls back to built-in templates.
+An AI provider is optional (on `main`; not in `v0.1.0`). If you don't have (or don't want to use) an API key, choose **"Skip — deploy without AI"** during `ship init`, or clear the provider later by selecting **"None — deploy without AI"** in `ship config`. With no key configured, Ship falls back to built-in templates.
 
-The no-key path produces the exact same artifacts as the AI path — Dockerfile, `docker-compose.yml`, Nginx config, and a GitHub Actions workflow — generated from your detected framework and dependencies instead of a written description. Instead of one freeform sentence, Ship asks two direct questions: your domain (optional) and whether to enable HTTPS.
-
-> **HTTPS note:** Enabling HTTPS configures Nginx to expect a TLS certificate, but nothing provisions one automatically yet — you'll need to issue a certificate (e.g. via certbot) on the server yourself. This is true for both the AI and no-key paths today, not something specific to deterministic mode.
+The no-key path generates a Dockerfile, `docker-compose.yml` and Nginx config from your detected framework and dependencies instead of a written description. It asks for your domain (optional) and deploys over HTTP. You can also pass `--no-ai` to skip a configured provider for one run, and if the provider fails Ship offers to continue with the templates.
 
 ---
 
@@ -168,8 +171,7 @@ Infrastructure
 * Docker Compose
 * PostgreSQL
 * Redis
-* GitHub Actions
-* Ubuntu VPS
+* Ubuntu VPS (Docker and Compose v2 already installed)
 
 Ship deploys server-side applications to a VPS you own; it doesn't host anything itself. See [Roadmap](#roadmap) for what's planned next.
 
@@ -200,13 +202,13 @@ Ship simply removes the repetitive DevOps work.
 * [x] SSH connections
 * [x] Docker generation
 * [x] Docker Compose generation
-* [x] GitHub Actions generation
 * [x] Nginx configuration
-* [x] HTTPS setup
 * [x] Deployment execution
 
 ### v0.2
 
+* [ ] [Automatic HTTPS](https://github.com/Koded0214h/ship/issues/16)
+* [ ] Working CI/CD generation
 * [ ] [Rollbacks](https://github.com/Koded0214h/ship/issues/2)
 * [ ] [Deployment history](https://github.com/Koded0214h/ship/issues/3)
 * [ ] [Interactive deployment plan editing](https://github.com/Koded0214h/ship/issues/4)
@@ -261,4 +263,3 @@ MIT — see [LICENSE](LICENSE).
 * [bubbles](https://github.com/charmbracelet/bubbles) — interactive components
 * [bubbletea](https://github.com/charmbracelet/bubbletea) — terminal UI
 * [huh](https://github.com/charmbracelet/huh) — prompts & forms
-* [glamour](https://github.com/charmbracelet/glamour) — Markdown rendering

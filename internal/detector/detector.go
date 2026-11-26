@@ -17,7 +17,9 @@ type ProjectInfo struct {
 	Port          int
 	EnvFileExists bool
 	PackageFiles  []string
-	RootDir       string
+	// RootDir is a local path. It is excluded from JSON so it is never sent
+	// to an AI provider.
+	RootDir string `json:"-"`
 }
 
 func Detect(dir string) (*ProjectInfo, error) {
@@ -132,7 +134,7 @@ func detectNodeFramework(dir string) string {
 
 func detectPythonFramework(dir string) string {
 	for _, file := range []string{"requirements.txt", "Pipfile", "pyproject.toml"} {
-		content := readFile(filepath.Join(dir, file))
+		content := strings.ToLower(readFile(filepath.Join(dir, file)))
 		switch {
 		case strings.Contains(content, "django"):
 			return "Django"
@@ -194,13 +196,13 @@ func detectServices(info *ProjectInfo, dir string) {
 	for _, pkgFile := range info.PackageFiles {
 		content := readFile(filepath.Join(dir, pkgFile))
 		lcontent := strings.ToLower(content)
-		if strings.Contains(lcontent, "postgres") || strings.Contains(lcontent, "psycopg") || strings.Contains(lcontent, "pg ") {
+		if strings.Contains(lcontent, "postgres") || strings.Contains(lcontent, "psycopg") || strings.Contains(lcontent, `"pg"`) || strings.Contains(lcontent, "gem 'pg'") || strings.Contains(lcontent, `gem "pg"`) {
 			info.HasDatabase = true
 		}
 		if strings.Contains(lcontent, "redis") || strings.Contains(lcontent, "celery") {
 			info.HasRedis = true
 		}
-		if strings.Contains(lcontent, "celery") || strings.Contains(lcontent, "sidekiq") || strings.Contains(lcontent, "bull") {
+		if hasWorker(lcontent) {
 			info.HasWorker = true
 		}
 	}
@@ -215,6 +217,17 @@ func detectServices(info *ProjectInfo, dir string) {
 	}
 }
 
+// hasWorker reports a background job library. Bull is matched as a package
+// name, so gems such as "bullet" do not count.
+func hasWorker(deps string) bool {
+	for _, lib := range []string{"celery", "sidekiq", `"bull"`, `"bullmq"`} {
+		if strings.Contains(deps, lib) {
+			return true
+		}
+	}
+	return false
+}
+
 func scanEnvForDB(path string) bool {
 	f, err := os.Open(path)
 	if err != nil {
@@ -224,7 +237,20 @@ func scanEnvForDB(path string) bool {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		line := strings.ToUpper(scanner.Text())
+		if strings.HasPrefix(line, "DATABASE_URL") && otherDatabase(line) {
+			continue
+		}
 		if strings.HasPrefix(line, "DATABASE_URL") || strings.HasPrefix(line, "DB_HOST") || strings.HasPrefix(line, "POSTGRES") {
+			return true
+		}
+	}
+	return false
+}
+
+// otherDatabase reports a connection string that is clearly not PostgreSQL.
+func otherDatabase(line string) bool {
+	for _, scheme := range []string{"MYSQL", "MARIADB", "SQLITE", "MONGODB", "SQLSERVER"} {
+		if strings.Contains(line, scheme) {
 			return true
 		}
 	}

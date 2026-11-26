@@ -61,3 +61,10 @@ func TestDockerComposeNoVolumesWithoutStatefulServices(t *testing.T) {
 		t.Errorf("did not expect a top-level volumes block with no database/redis:\n%s", got)
 	}
 }
+
+func TestNoWorkerWithoutAKnownCommand(t *testing.T) {
+	info := &detector.ProjectInfo{Language: "Python", Framework: "FastAPI", HasWorker: true}
+	if got := DockerCompose(info, "myapp", 8000, false); contains(got, "worker") {
+		t.Errorf("a Python app must not be given a Node worker:\n%s", got)
+	}
+}

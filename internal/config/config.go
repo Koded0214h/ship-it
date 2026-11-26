@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -67,7 +69,15 @@ func Save(cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("encoding config: %w", err)
 	}
-	return os.WriteFile(path, data, 0600)
+	return writePrivate(path, data)
+}
+
+// writePrivate also tightens the permissions of a file that already exists.
+func writePrivate(path string, data []byte) error {
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		return err
+	}
+	return os.Chmod(path, 0600)
 }
 
 func SaveNew(cfg *Config) error {
@@ -78,19 +88,72 @@ func SaveNew(cfg *Config) error {
 	if err != nil {
 		return fmt.Errorf("encoding config: %w", err)
 	}
-	return os.WriteFile(filepath.Join(configDir, configFile), data, 0600)
+	return writePrivate(filepath.Join(configDir, configFile), data)
+}
+
+// These values end up in remote shell commands and config files, so they are
+// restricted to safe characters.
+var (
+	appNameRe  = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.-]{0,62}$`)
+	hostnameRe = regexp.MustCompile(`^[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?(\.[A-Za-z0-9_]([A-Za-z0-9_-]{0,61}[A-Za-z0-9_])?)*\.?$`)
+	userRe     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_.-]*\$?$`)
+)
+
+func ValidateAppName(s string) error {
+	if s == "" {
+		return fmt.Errorf("app.name is required")
+	}
+	if !appNameRe.MatchString(s) {
+		return fmt.Errorf("app.name %q may only use letters, digits, '.', '_' and '-', and must start with a letter or digit", s)
+	}
+	return nil
+}
+
+func ValidateDomain(s string) error {
+	if len(s) > 253 || !hostnameRe.MatchString(s) {
+		return fmt.Errorf("domain %q is not a valid hostname (no scheme, path or port)", s)
+	}
+	return nil
+}
+
+func ValidateHost(s string) error {
+	if s == "" {
+		return fmt.Errorf("server.host is required")
+	}
+	if net.ParseIP(s) == nil && !hostnameRe.MatchString(s) {
+		return fmt.Errorf("server.host %q is not a valid hostname or IP address", s)
+	}
+	return nil
+}
+
+func ValidateUser(s string) error {
+	if s == "" {
+		return fmt.Errorf("server.user is required")
+	}
+	if !userRe.MatchString(s) {
+		return fmt.Errorf("server.user %q is not a valid user name", s)
+	}
+	return nil
 }
 
 func Validate(cfg *Config) []string {
 	var errs []string
-	if cfg.App.Name == "" {
-		errs = append(errs, "app.name is required")
+	add := func(err error) {
+		if err != nil {
+			errs = append(errs, err.Error())
+		}
 	}
-	if cfg.Server.Host == "" {
-		errs = append(errs, "server.host is required")
+	add(ValidateAppName(cfg.App.Name))
+	add(ValidateHost(cfg.Server.Host))
+	add(ValidateUser(cfg.Server.User))
+	if cfg.App.Domain != "" {
+		add(ValidateDomain(cfg.App.Domain))
 	}
-	if cfg.Server.User == "" {
-		errs = append(errs, "server.user is required")
+	if cfg.App.Port < 0 || cfg.App.Port > 65535 {
+		errs = append(errs, "app.port must be between 0 (auto-detect) and 65535")
+	}
+	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
+		errs = append(errs, "server.port must be between 1 and 65535")
 	}
 	return errs
 }
@@ -98,6 +161,15 @@ func Validate(cfg *Config) []string {
 func Exists() bool {
 	_, err := findConfigFile()
 	return err == nil
+}
+
+// Root returns the project directory: the one containing .ship/.
+func Root() (string, error) {
+	path, err := findConfigFile()
+	if err != nil {
+		return "", err
+	}
+	return filepath.Dir(filepath.Dir(path)), nil
 }
 
 func findConfigFile() (string, error) {

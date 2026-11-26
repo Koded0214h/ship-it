@@ -1,13 +1,14 @@
 package ssh
 
 import (
-	"archive/tar"
+	"bufio"
 	"bytes"
-	"compress/gzip"
+	"context"
 	"fmt"
 	"io"
 	"net"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -27,6 +28,12 @@ type Config struct {
 	User    string
 	KeyPath string
 	Port    int
+
+	// KnownHostsPath defaults to ~/.ssh/known_hosts.
+	KnownHostsPath string
+	// ConfirmHostKey is asked before trusting a server seen for the first
+	// time. When nil, unknown servers are refused.
+	ConfirmHostKey ConfirmHostKeyFunc
 }
 
 func Connect(cfg Config) (*Client, error) {
@@ -40,12 +47,17 @@ func Connect(cfg Config) (*Client, error) {
 		return nil, fmt.Errorf("parsing SSH key: %w", err)
 	}
 
-	addr := fmt.Sprintf("%s:%d", cfg.Host, cfg.Port)
+	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
+	hostKeys, algorithms, err := hostKeyVerifier(cfg.KnownHostsPath, addr, cfg.ConfirmHostKey)
+	if err != nil {
+		return nil, err
+	}
 	conn, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{
-		User:            cfg.User,
-		Auth:            []ssh.AuthMethod{ssh.PublicKeys(signer)},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         15 * time.Second,
+		User:              cfg.User,
+		Auth:              []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		HostKeyCallback:   hostKeys,
+		HostKeyAlgorithms: algorithms,
+		Timeout:           15 * time.Second,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("SSH connect to %s: %w", addr, err)
@@ -57,226 +69,110 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-func (c *Client) Exec(cmd string) (stdout, stderr string, err error) {
-	sess, err := c.conn.NewSession()
-	if err != nil {
-		return "", "", fmt.Errorf("new session: %w", err)
-	}
-	defer sess.Close()
-
-	var outBuf, errBuf bytes.Buffer
-	sess.Stdout = &outBuf
-	sess.Stderr = &errBuf
-	err = sess.Run(cmd)
-	return outBuf.String(), errBuf.String(), err
+// Quote makes s safe to use as a single POSIX shell word.
+func Quote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-func (c *Client) ExecStream(cmd string, out io.Writer) error {
+// run executes cmd and waits for it, closing the session if ctx ends first.
+func (c *Client) run(ctx context.Context, cmd string, stdin io.Reader, stdout, stderr io.Writer) error {
 	sess, err := c.conn.NewSession()
 	if err != nil {
 		return fmt.Errorf("new session: %w", err)
 	}
 	defer sess.Close()
-	sess.Stdout = out
-	sess.Stderr = out
-	return sess.Run(cmd)
+	sess.Stdin = stdin
+	sess.Stdout = stdout
+	sess.Stderr = stderr
+
+	if err := sess.Start(cmd); err != nil {
+		return err
+	}
+	done := make(chan error, 1)
+	go func() { done <- sess.Wait() }()
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		sess.Close()
+		return ctx.Err()
+	}
 }
 
-// Upload writes content to remotePath on the server using SCP.
-func (c *Client) Upload(content, remotePath string) error {
+// Output runs cmd and returns its standard output.
+func (c *Client) Output(ctx context.Context, cmd string) (string, error) {
+	var out, errOut bytes.Buffer
+	if err := c.run(ctx, cmd, nil, &out, &errOut); err != nil {
+		if msg := strings.TrimSpace(errOut.String()); msg != "" {
+			return out.String(), fmt.Errorf("%w: %s", err, msg)
+		}
+		return out.String(), err
+	}
+	return out.String(), nil
+}
+
+// Stream runs cmd, copying both standard output and standard error to out.
+func (c *Client) Stream(ctx context.Context, cmd string, out io.Writer) error {
+	w := &syncWriter{w: out}
+	return c.run(ctx, cmd, nil, w, w)
+}
+
+// WriteFile writes content to a remote file and sets its permissions. The file
+// is never readable by others while it is being written.
+func (c *Client) WriteFile(ctx context.Context, remotePath, content string, mode os.FileMode) error {
+	cmd := fmt.Sprintf("mkdir -p %s && (umask 077 && cat > %s) && chmod %o %s",
+		Quote(path.Dir(remotePath)), Quote(remotePath), mode.Perm(), Quote(remotePath))
+	var errOut bytes.Buffer
+	if err := c.run(ctx, cmd, strings.NewReader(content), io.Discard, &errOut); err != nil {
+		return fmt.Errorf("write file %s: %w\n%s", remotePath, err, errOut.String())
+	}
+	return nil
+}
+
+// Lock takes an exclusive lock on lockPath using flock on the server. The lock
+// is released by calling the returned function, or automatically if the
+// connection drops.
+func (c *Client) Lock(ctx context.Context, lockPath string) (func(), error) {
 	sess, err := c.conn.NewSession()
 	if err != nil {
-		return fmt.Errorf("new session: %w", err)
+		return nil, fmt.Errorf("new session: %w", err)
 	}
-	defer sess.Close()
+	stdin, err := sess.StdinPipe()
+	if err != nil {
+		sess.Close()
+		return nil, err
+	}
+	stdout, err := sess.StdoutPipe()
+	if err != nil {
+		sess.Close()
+		return nil, err
+	}
+	// cat holds the lock until its stdin closes.
+	if err := sess.Start(fmt.Sprintf("flock -n %s sh -c 'echo locked; cat >/dev/null'", Quote(lockPath))); err != nil {
+		sess.Close()
+		return nil, err
+	}
 
-	dir := filepath.Dir(remotePath)
-	filename := filepath.Base(remotePath)
-	size := len(content)
-
+	got := make(chan string, 1)
 	go func() {
-		w, _ := sess.StdinPipe()
-		defer w.Close()
-		fmt.Fprintf(w, "C0644 %d %s\n", size, filename)
-		io.WriteString(w, content)
-		fmt.Fprint(w, "\x00")
+		line, _ := bufio.NewReader(stdout).ReadString('\n')
+		got <- strings.TrimSpace(line)
 	}()
-
-	return sess.Run(fmt.Sprintf("mkdir -p %s && scp -qt %s", dir, dir))
-}
-
-// UploadFile uploads a local file to the remote server.
-func (c *Client) UploadFile(localPath, remotePath string) error {
-	data, err := os.ReadFile(localPath)
-	if err != nil {
-		return err
-	}
-	return c.Upload(string(data), remotePath)
-}
-
-// WriteFileSudo writes content to a remote path that requires root, using sudo tee.
-func (c *Client) WriteFileSudo(remotePath, content string) error {
-	dir := filepath.Dir(remotePath)
-	if _, _, err := c.Exec(fmt.Sprintf("sudo mkdir -p %s", dir)); err != nil {
-		return fmt.Errorf("sudo mkdir %s: %w", dir, err)
-	}
-
-	sess, err := c.conn.NewSession()
-	if err != nil {
-		return err
-	}
-	defer sess.Close()
-
-	var errBuf bytes.Buffer
-	sess.Stderr = &errBuf
-	w, err := sess.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	if err := sess.Start(fmt.Sprintf("sudo tee %s > /dev/null", remotePath)); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w, content); err != nil {
-		return err
-	}
-	w.Close()
-	if err := sess.Wait(); err != nil {
-		return fmt.Errorf("sudo tee %s: %w\n%s", remotePath, err, errBuf.String())
-	}
-	return nil
-}
-
-// MkdirAll creates directories on the remote server.
-func (c *Client) MkdirAll(path string) error {
-	_, _, err := c.Exec(fmt.Sprintf("mkdir -p %s", path))
-	return err
-}
-
-// WriteFile writes content to a remote file.
-func (c *Client) WriteFile(remotePath, content string) error {
-	dir := filepath.Dir(remotePath)
-	if _, _, err := c.Exec(fmt.Sprintf("mkdir -p %s", dir)); err != nil {
-		return err
-	}
-	// Use heredoc-style approach via stdin
-	sess, err := c.conn.NewSession()
-	if err != nil {
-		return err
-	}
-	defer sess.Close()
-
-	var errBuf bytes.Buffer
-	sess.Stderr = &errBuf
-	w, err := sess.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	if err := sess.Start(fmt.Sprintf("cat > %s", remotePath)); err != nil {
-		return err
-	}
-	if _, err := io.WriteString(w, content); err != nil {
-		return err
-	}
-	w.Close()
-	if err := sess.Wait(); err != nil {
-		return fmt.Errorf("write file %s: %w\n%s", remotePath, err, errBuf.String())
-	}
-	return nil
-}
-
-// UploadDir tars localDir and extracts it into remoteDir on the server.
-// It skips common build artifacts and large files.
-func (c *Client) UploadDir(localDir, remoteDir string) error {
-	skipDirs := map[string]bool{
-		".git": true, ".ship": true, "node_modules": true, "vendor": true,
-		"__pycache__": true, ".venv": true, "venv": true, "env": true,
-		"dist": true, "build": true, ".next": true, "target": true, ".idea": true,
-	}
-
-	var buf bytes.Buffer
-	gw := gzip.NewWriter(&buf)
-	tw := tar.NewWriter(gw)
-
-	err := filepath.Walk(localDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
+	select {
+	case line := <-got:
+		if line != "locked" {
+			sess.Close()
+			return nil, fmt.Errorf("another deployment of this app appears to be running (could not lock %s)", lockPath)
 		}
-		rel, err := filepath.Rel(localDir, path)
-		if err != nil {
-			return err
-		}
-		if rel == "." {
-			return nil
-		}
-
-		// Skip based on top-level component
-		parts := strings.SplitN(rel, string(filepath.Separator), 2)
-		if skipDirs[parts[0]] {
-			if info.IsDir() {
-				return filepath.SkipDir
-			}
-			return nil
-		}
-
-		// Skip directories themselves (tar recreates them via file paths)
-		if info.IsDir() {
-			return nil
-		}
-
-		// Skip files over 30 MB
-		if info.Size() > 30*1024*1024 {
-			return nil
-		}
-
-		hdr, err := tar.FileInfoHeader(info, "")
-		if err != nil {
-			return err
-		}
-		hdr.Name = filepath.ToSlash(rel)
-
-		if err := tw.WriteHeader(hdr); err != nil {
-			return err
-		}
-		f, err := os.Open(path)
-		if err != nil {
-			return err
-		}
-		defer f.Close()
-		_, err = io.Copy(tw, f)
-		return err
-	})
-	if err != nil {
-		return fmt.Errorf("building source archive: %w", err)
+	case <-ctx.Done():
+		sess.Close()
+		return nil, ctx.Err()
 	}
-	tw.Close()
-	gw.Close()
-
-	sess, err := c.conn.NewSession()
-	if err != nil {
-		return fmt.Errorf("new session: %w", err)
-	}
-	defer sess.Close()
-
-	var errBuf bytes.Buffer
-	sess.Stderr = &errBuf
-	w, err := sess.StdinPipe()
-	if err != nil {
-		return err
-	}
-
-	if err := sess.Start(fmt.Sprintf("mkdir -p %s && tar xzf - -C %s", remoteDir, remoteDir)); err != nil {
-		return err
-	}
-	if _, err := io.Copy(w, &buf); err != nil {
-		return err
-	}
-	w.Close()
-	if err := sess.Wait(); err != nil {
-		return fmt.Errorf("extract source archive: %w\n%s", err, errBuf.String())
-	}
-	return nil
+	return func() {
+		stdin.Close()
+		_ = sess.Wait()
+		sess.Close()
+	}, nil
 }
 
 // ServerInfo returns basic server information.
@@ -286,45 +182,39 @@ type ServerInfo struct {
 	Disk    string
 	Memory  string
 	Docker  bool
+	Compose bool
 }
 
-func (c *Client) GetServerInfo() ServerInfo {
+func (c *Client) GetServerInfo(ctx context.Context) ServerInfo {
 	info := ServerInfo{}
-	if out, _, err := c.Exec("uname -sr"); err == nil {
+	if out, err := c.Output(ctx, "uname -sr"); err == nil {
 		info.OS = strings.TrimSpace(out)
 	}
-	if out, _, err := c.Exec("uname -m"); err == nil {
+	if out, err := c.Output(ctx, "uname -m"); err == nil {
 		info.Arch = strings.TrimSpace(out)
 	}
-	if out, _, err := c.Exec("df -h / | tail -1 | awk '{print $4}' "); err == nil {
+	if out, err := c.Output(ctx, "df -h / | tail -1 | awk '{print $4}'"); err == nil {
 		info.Disk = strings.TrimSpace(out) + " available"
 	}
-	if out, _, err := c.Exec("free -h | grep Mem | awk '{print $7}'"); err == nil {
+	if out, err := c.Output(ctx, "free -h | grep Mem | awk '{print $7}'"); err == nil {
 		info.Memory = strings.TrimSpace(out) + " available"
 	}
-	if _, _, err := c.Exec("docker --version"); err == nil {
+	// "docker info" also fails when the daemon is down or the user may not use it.
+	if _, err := c.Output(ctx, "docker info >/dev/null 2>&1"); err == nil {
 		info.Docker = true
+	}
+	if _, err := c.Output(ctx, "docker compose version >/dev/null 2>&1"); err == nil {
+		info.Compose = true
 	}
 	return info
 }
 
-// IsPortOpen checks if a TCP port is accepting connections.
-func IsPortOpen(host string, port int) bool {
-	addr := net.JoinHostPort(host, strconv.Itoa(port))
-	conn, err := net.DialTimeout("tcp", addr, 5*time.Second)
-	if err != nil {
-		return false
-	}
-	conn.Close()
-	return true
-}
-
-func expandHome(path string) string {
-	if strings.HasPrefix(path, "~/") {
+func expandHome(p string) string {
+	if strings.HasPrefix(p, "~/") {
 		home, err := os.UserHomeDir()
 		if err == nil {
-			return filepath.Join(home, path[2:])
+			return filepath.Join(home, p[2:])
 		}
 	}
-	return path
+	return p
 }

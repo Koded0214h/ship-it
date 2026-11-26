@@ -8,7 +8,6 @@ import (
 
 	"github.com/Koded0214h/ship/internal/ai"
 	"github.com/Koded0214h/ship/internal/config"
-	sshclient "github.com/Koded0214h/ship/internal/ssh"
 	"github.com/Koded0214h/ship/internal/ui"
 	"github.com/spf13/cobra"
 )
@@ -33,7 +32,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		} else {
 			line := fmt.Sprintf("  %s %s", ui.CheckMark, name)
 			if detail != "" {
-				line += ui.MutedStyle.Render("  "+detail)
+				line += ui.MutedStyle.Render("  " + detail)
 			}
 			fmt.Println(line)
 		}
@@ -54,16 +53,11 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	if cfgErr != nil {
 		fmt.Println()
 		fmt.Println(ui.ErrorStyle.Render("Cannot continue — config not loaded."))
-		return nil
+		return fmt.Errorf("diagnostics failed")
 	}
 
 	check("SSH connection", func() (string, error) {
-		client, err := sshclient.Connect(sshclient.Config{
-			Host:    cfg.Server.Host,
-			User:    cfg.Server.User,
-			KeyPath: cfg.Server.KeyPath,
-			Port:    cfg.Server.Port,
-		})
+		client, err := connect(cfg)
 		if err != nil {
 			return "", err
 		}
@@ -72,21 +66,19 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	})
 
 	check("Docker on server", func() (string, error) {
-		client, err := sshclient.Connect(sshclient.Config{
-			Host:    cfg.Server.Host,
-			User:    cfg.Server.User,
-			KeyPath: cfg.Server.KeyPath,
-			Port:    cfg.Server.Port,
-		})
+		client, err := connect(cfg)
 		if err != nil {
 			return "", fmt.Errorf("SSH not available")
 		}
 		defer client.Close()
-		info := client.GetServerInfo()
+		info := client.GetServerInfo(cmd.Context())
 		if !info.Docker {
-			return "", fmt.Errorf("Docker not found — run: apt-get install -y docker.io docker-compose-plugin")
+			return "", fmt.Errorf("Docker is missing, not running, or not usable by %s — https://docs.docker.com/engine/install/", cfg.Server.User)
 		}
-		return "Docker installed", nil
+		if !info.Compose {
+			return "", fmt.Errorf("Docker Compose v2 is not installed")
+		}
+		return "Docker and Compose available", nil
 	})
 
 	check("AI provider API key", func() (string, error) {
@@ -97,7 +89,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 		if err != nil {
 			return "", err
 		}
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		ctx, cancel := context.WithTimeout(cmd.Context(), 20*time.Second)
 		defer cancel()
 		if err := provider.Ping(ctx); err != nil {
 			return "", fmt.Errorf("%s key invalid or unreachable: %v", provider.Name(), err)
@@ -121,7 +113,7 @@ func runDoctor(cmd *cobra.Command, args []string) error {
 	if allOk {
 		fmt.Println(ui.SuccessStyle.Render("✓ All checks passed! You're ready to deploy."))
 	} else {
-		fmt.Println(ui.WarningStyle.Render("⚠ Some checks failed. Review the errors above."))
+		return fmt.Errorf("some checks failed — review the errors above")
 	}
 
 	return nil

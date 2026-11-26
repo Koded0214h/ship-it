@@ -38,7 +38,8 @@ func FindExisting() []string {
 	return found
 }
 
-// Generate creates a new ED25519 key pair at ~/.ssh/ship_ed25519.
+// Generate creates a new ED25519 key pair at ~/.ssh/ship_ed25519. It never
+// replaces an existing key.
 func Generate() (*KeyInfo, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -52,6 +53,12 @@ func Generate() (*KeyInfo, error) {
 	privPath := filepath.Join(sshDir, "ship_ed25519")
 	pubPath := privPath + ".pub"
 
+	for _, p := range []string{privPath, pubPath} {
+		if _, err := os.Lstat(p); err == nil {
+			return nil, fmt.Errorf("%s already exists; not overwriting it", p)
+		}
+	}
+
 	pubRaw, priv, err := ed25519.GenerateKey(rand.Reader)
 	if err != nil {
 		return nil, fmt.Errorf("generating key: %w", err)
@@ -63,7 +70,7 @@ func Generate() (*KeyInfo, error) {
 		return nil, fmt.Errorf("encoding private key: %w", err)
 	}
 	privPEM := pem.EncodeToMemory(pemBlock)
-	if err := os.WriteFile(privPath, privPEM, 0600); err != nil {
+	if err := writeNew(privPath, privPEM, 0600); err != nil {
 		return nil, fmt.Errorf("writing private key: %w", err)
 	}
 
@@ -73,7 +80,7 @@ func Generate() (*KeyInfo, error) {
 		return nil, fmt.Errorf("encoding public key: %w", err)
 	}
 	pubLine := strings.TrimSpace(string(ssh.MarshalAuthorizedKey(sshPub))) + " ship-deploy\n"
-	if err := os.WriteFile(pubPath, []byte(pubLine), 0644); err != nil {
+	if err := writeNew(pubPath, []byte(pubLine), 0644); err != nil {
 		return nil, fmt.Errorf("writing public key: %w", err)
 	}
 
@@ -83,4 +90,16 @@ func Generate() (*KeyInfo, error) {
 		IsNew:       true,
 		PublicKey:   strings.TrimSpace(pubLine),
 	}, nil
+}
+
+func writeNew(path string, data []byte, mode os.FileMode) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		f.Close()
+		return err
+	}
+	return f.Close()
 }

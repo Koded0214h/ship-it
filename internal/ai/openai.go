@@ -65,6 +65,10 @@ Generate the complete deployment plan as a single JSON object.`, string(projectJ
 		return nil, fmt.Errorf("empty response from OpenAI")
 	}
 
+	if resp.Choices[0].FinishReason == openai.FinishReasonLength {
+		return nil, fmt.Errorf("the response from OpenAI was cut off before the plan was complete")
+	}
+
 	raw := resp.Choices[0].Message.Content
 	var plan DeploymentPlan
 	if err := json.Unmarshal([]byte(raw), &plan); err != nil {

@@ -4,11 +4,12 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/Koded0214h/ship/internal/config"
 	"github.com/Koded0214h/ship/internal/ui"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -71,6 +72,7 @@ func runConfig(cmd *cobra.Command, args []string) error {
 }
 
 func editAI(cfg *config.Config) error {
+	provider, model, newKey := cfg.AI.Provider, cfg.AI.Model, ""
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -81,28 +83,44 @@ func editAI(cfg *config.Config) error {
 					huh.NewOption("Google Gemini", "gemini"),
 					huh.NewOption("None — deploy without AI", ""),
 				).
-				Value(&cfg.AI.Provider),
+				Value(&provider),
 			huh.NewInput().
 				Title("API key").
-				Description("Leave blank if you selected 'None' above").
+				Description("Leave blank to keep the current key for the same provider").
 				EchoMode(huh.EchoModePassword).
-				Value(&cfg.AI.APIKey),
+				Value(&newKey),
 			huh.NewInput().
 				Title("Model").
 				Description("Leave blank to use the default model for the provider").
 				Placeholder("e.g. claude-sonnet-4-6 / gpt-4o / gemini-2.5-flash").
-				Value(&cfg.AI.Model),
+				Value(&model),
 		),
 	).Run()
 	if err != nil {
 		return err
 	}
-	if cfg.AI.Provider == "" {
-		cfg.AI.APIKey = ""
-		cfg.AI.Model = ""
-	} else if cfg.AI.APIKey == "" {
-		return fmt.Errorf("API key is required when a provider is selected")
+	return applyAI(cfg, provider, newKey, model)
+}
+
+// applyAI never carries a key or model across providers, so one vendor's key is
+// not sent to another.
+func applyAI(cfg *config.Config, provider, newKey, model string) error {
+	changed := provider != cfg.AI.Provider
+	if provider == "" {
+		cfg.AI = config.AIConfig{}
+		return nil
 	}
+	if changed && model == cfg.AI.Model {
+		model = ""
+	}
+	key := newKey
+	if key == "" && !changed {
+		key = cfg.AI.APIKey
+	}
+	if key == "" {
+		return fmt.Errorf("an API key is required for the selected provider")
+	}
+	cfg.AI = config.AIConfig{Provider: provider, APIKey: key, Model: model}
 	return nil
 }
 
@@ -113,26 +131,16 @@ func editApp(cfg *config.Config) error {
 			huh.NewInput().
 				Title("App name").
 				Value(&cfg.App.Name).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("app name is required")
-					}
-					return nil
-				}),
+				Validate(config.ValidateAppName),
 			huh.NewInput().
 				Title("Domain").
 				Placeholder("api.example.com").
 				Value(&cfg.App.Domain),
 			huh.NewInput().
 				Title("Port").
+				Description("The port your app listens on (0 = detect)").
 				Value(&portStr).
-				Validate(func(s string) error {
-					_, err := strconv.Atoi(s)
-					if err != nil {
-						return fmt.Errorf("must be a number")
-					}
-					return nil
-				}),
+				Validate(validPort(0)),
 		),
 	).Run()
 	if err != nil {
@@ -150,12 +158,7 @@ func editServer(cfg *config.Config) error {
 				Title("Server host").
 				Placeholder("123.456.789.0").
 				Value(&cfg.Server.Host).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("server host is required")
-					}
-					return nil
-				}),
+				Validate(config.ValidateHost),
 			huh.NewInput().
 				Title("SSH user").
 				Value(&cfg.Server.User),
@@ -165,13 +168,7 @@ func editServer(cfg *config.Config) error {
 			huh.NewInput().
 				Title("SSH port").
 				Value(&portStr).
-				Validate(func(s string) error {
-					_, err := strconv.Atoi(s)
-					if err != nil {
-						return fmt.Errorf("must be a number")
-					}
-					return nil
-				}),
+				Validate(validPort(1)),
 		),
 	).Run()
 	if err != nil {
@@ -179,6 +176,15 @@ func editServer(cfg *config.Config) error {
 	}
 	cfg.Server.Port, _ = strconv.Atoi(portStr)
 	return nil
+}
+
+func validPort(min int) func(string) error {
+	return func(s string) error {
+		if n, err := strconv.Atoi(s); err != nil || n < min || n > 65535 {
+			return fmt.Errorf("must be a number from %d to 65535", min)
+		}
+		return nil
+	}
 }
 
 func printCurrentConfig(cfg *config.Config) {
@@ -213,7 +219,7 @@ func printCurrentConfig(cfg *config.Config) {
 	fmt.Printf("  %s %s\n", label.Render("Model"), value.Render(orDash(cfg.AI.Model)))
 
 	// Warn if config looks wrong
-	if cfg.AI.Provider == "gemini" && len(cfg.AI.APIKey) > 0 && cfg.AI.APIKey[:2] != "AI" {
+	if cfg.AI.Provider == "gemini" && len(cfg.AI.APIKey) > 0 && !strings.HasPrefix(cfg.AI.APIKey, "AI") {
 		fmt.Println()
 		fmt.Println(ui.WarningStyle.Render("  ⚠ Gemini API keys should start with 'AIza'. Get yours at: aistudio.google.com"))
 	}

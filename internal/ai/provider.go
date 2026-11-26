@@ -8,16 +8,13 @@ import (
 )
 
 type DeploymentPlan struct {
-	Dockerfile     string            `json:"dockerfile"`
-	DockerCompose  string            `json:"docker_compose"`
-	NginxConfig    string            `json:"nginx_config"`
-	GitHubActions  string            `json:"github_actions"`
-	Services       []string          `json:"services"`
-	SSLEnabled     bool              `json:"ssl_enabled"`
-	Domain         string            `json:"domain"`
-	EnvVars        map[string]string `json:"env_vars"`
-	Steps          []string          `json:"steps"`
-	Summary        string            `json:"summary"`
+	Dockerfile    string            `json:"dockerfile"`
+	DockerCompose string            `json:"docker_compose"`
+	Services      []string          `json:"services"`
+	SSLEnabled    bool              `json:"ssl_enabled"`
+	Domain        string            `json:"domain"`
+	EnvVars       map[string]string `json:"env_vars"`
+	Summary       string            `json:"summary"`
 }
 
 type Provider interface {
@@ -46,13 +43,10 @@ Given a project description and user requirements, you output a structured JSON 
 
 - dockerfile: Complete multi-stage Dockerfile content (string)
 - docker_compose: Complete docker-compose.yml content (string)
-- nginx_config: Complete Nginx config content (string)
-- github_actions: Complete GitHub Actions workflow YAML (string)
 - services: List of service names included (e.g. ["app", "postgres", "redis"])
-- ssl_enabled: Whether HTTPS/SSL is configured (boolean)
+- ssl_enabled: Always false; HTTPS is not supported yet (boolean)
 - domain: The app domain (string, empty if not provided)
 - env_vars: Map of required environment variables with placeholder values
-- steps: Human-readable list of deployment steps that will be executed
 - summary: 2-3 sentence summary of what will be deployed
 
 CRITICAL RULES — follow exactly:
@@ -74,10 +68,10 @@ COMPOSE & DOCKERFILE:
 - Always use Docker Compose v2 syntax (no "version:" field at the top)
 - The main application service in docker-compose MUST always be named exactly "app" — never the project name, never "web", never "server"
 - Nginx runs as a Docker container (image: nginx:alpine), NOT as a system service
-- Nginx config is mounted from ./nginx.conf into the nginx container at /etc/nginx/nginx.conf — this replaces the FULL nginx.conf, so it MUST include events {} and http {} wrapper blocks
-- The nginx container proxies to the app container using Docker DNS: upstream target is "app:<port>" (e.g. server app:8000)
-- nginx_config must always start with: events { worker_connections 1024; } followed by http { ... containing all upstream and server blocks ... }
-- For SSL: include a certbot container that shares a volume with nginx for certificates
+- The service named "nginx" is required. It mounts ./nginx.conf:/etc/nginx/nginx.conf:ro (Ship writes that file) and publishes only "80:80"
+- The app listens on the detected port. Publish it only on loopback ("127.0.0.1:<port>:<port>") or not at all. No other service may publish ports
+- Never use privileged, cap_add, devices, host networking, the Docker socket, or volumes from absolute or parent paths
+- Do not include certbot or any HTTPS setup
 - Multi-stage builds: ONLY for compiled languages (Go, Rust, Java). Never for Python, Node.js, Ruby, or PHP
 - Python Dockerfiles: single stage only (FROM python:3.11-slim). Run pip install as root before switching to non-root user. Use CMD ["python", "-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"] for FastAPI/ASGI apps — never bare "uvicorn" as the executable since it may not be in PATH
 - Python gunicorn: CMD ["python", "-m", "gunicorn", ...] — same reason
@@ -89,7 +83,6 @@ ENVIRONMENT VARIABLES:
 - Every ${VARIABLE} used in docker-compose.yml must appear in env_vars
 
 OTHER:
-- ssl_enabled must be false unless the user provides an actual domain name (e.g. myapp.example.com). Never set ssl_enabled true for raw IP addresses
-- GitHub Actions triggers on push to main; uses SSH to pull and restart containers on the server
+- ssl_enabled must be false
 - Output ONLY valid JSON — no markdown fences, no comments, no trailing commas`
 }

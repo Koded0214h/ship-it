@@ -1,6 +1,6 @@
 # AI Providers
 
-Ship needs an AI provider to turn your project info and deployment description into a `DeploymentPlan`. You configure exactly one provider per project, in `.ship/config.yaml` (see [Configuration](configuration.md)).
+An AI provider is optional. It turns your project info and deployment description into a `DeploymentPlan`; without one, Ship uses built-in templates. You configure at most one provider per project, in `.ship/config.yaml` (see [Configuration](configuration.md)).
 
 ## Supported providers
 
@@ -18,7 +18,7 @@ You only need an API key for the one provider you pick — Ship never calls more
 
 ## What every provider is asked to generate
 
-All three providers receive the same system prompt and are expected to return the same JSON shape: a Dockerfile, `docker-compose.yml`, Nginx config, GitHub Actions workflow, list of services, SSL flag, domain, required env vars, human-readable steps, and a summary.
+All three providers receive the same system prompt and are expected to return the same JSON shape: a Dockerfile, `docker-compose.yml`, list of services, SSL flag (always false for now), domain, required env vars, and a summary.
 
 The prompt constrains what comes back, regardless of provider:
 
@@ -26,8 +26,10 @@ The prompt constrains what comes back, regardless of provider:
 - **Images** — official Docker Hub images only (no Bitnami or other third-party registries), major.minor tags at most, `-alpine`/`-slim` variants preferred.
 - **Compose** — Compose v2 syntax, the app service is always named `app` (never the project name), Nginx runs as a container proxying to `app:<port>`.
 - **Dockerfiles** — multi-stage builds only for compiled languages (Go, Rust, Java); single-stage for Python/Node/Ruby/PHP; non-root user; health checks; `restart: unless-stopped`.
-- **SSL** — only enabled when you provide a real domain, never for a raw IP.
-- **CI/CD** — the GitHub Actions workflow triggers on push to `main` and deploys over SSH.
+- **Safety** — no privileged containers, host networking, Docker socket or host paths; only nginx publishes a public port.
+- **No HTTPS or CI/CD** — neither is supported yet.
+
+The prompt is only a request. Every plan is checked by `deploy.ValidatePlan`, shown to you in full, and run only after you confirm. If the provider fails or the plan is rejected, Ship offers the built-in template.
 
 See `internal/ai/provider.go` for the exact prompt if you're debugging a specific generation issue.
 

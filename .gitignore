@@ -9,3 +9,6 @@
 
 # goreleaser output (regenerated on release)
 /dist/
+
+# Private working notes and audits (may describe unfixed security issues)
+/notes/

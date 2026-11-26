@@ -46,12 +46,6 @@ http {
             proxy_send_timeout 60s;
             proxy_read_timeout 60s;
         }
-
-        location /health {
-            access_log off;
-            return 200 "ok\n";
-            add_header Content-Type text/plain;
-        }
     }
 }
 `, appName, port, serverName, appName)
@@ -104,13 +98,7 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_cache_bypass $http_upgrade;
     }
-
-    location /health {
-        access_log off;
-        return 200 "ok\n";
-        add_header Content-Type text/plain;
-    }
 }
-} /* http */
+}
 `, port, domain, domain, domain, domain)
 }

@@ -20,7 +20,7 @@ func DockerCompose(info *detector.ProjectInfo, appName string, port int, ssl boo
 	if info.HasRedis {
 		sb.WriteString(redisService())
 	}
-	if info.HasWorker {
+	if info.HasWorker && workerCommand(info) != "" {
 		sb.WriteString(workerService(info, appName))
 	}
 
@@ -166,7 +166,10 @@ func workerCommand(info *detector.ProjectInfo) string {
 		return `["python", "-m", "celery", "-A", "config", "worker", "--loglevel=info"]`
 	case "Rails":
 		return `["bundle", "exec", "sidekiq"]`
-	default:
+	}
+	// Ship does not know how to start a worker for other stacks, so it adds none.
+	if info.Language == "" || info.Language == "Node.js" {
 		return `["node", "worker.js"]`
 	}
+	return ""
 }
