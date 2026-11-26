@@ -1,0 +1,3 @@
+require 'sinatra'
+
+get('/') { 'ok' }

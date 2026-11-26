@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -78,7 +79,7 @@ func (e *Executor) steps() []step {
 	return []step{
 		{"Check server requirements", e.preflight},
 		{"Lock app directory", e.lockAppDir},
-		{"Check port 80 is available", e.checkPort},
+		{fmt.Sprintf("Check port %d is available", e.cfg.App.ListenPort()), e.checkPort},
 		{"Upload source code", e.uploadSourceCode},
 		{"Write deployment files", e.writeDeploymentFiles},
 		{"Create .env if missing", e.writeEnvTemplate},
@@ -163,17 +164,18 @@ func (e *Executor) inApp(cmd string) string {
 	return "cd " + sshclient.Quote(e.appDir) + " && " + cmd
 }
 
-// checkPort fails early if something other than this app already holds port 80.
+// checkPort fails early if something other than this app already holds the port.
 func (e *Executor) checkPort(ctx context.Context) error {
 	// On a first deploy there is no compose file yet, so errors mean "not ours".
-	ours, _ := e.client.Output(ctx, e.inApp(compose+" ps -q nginx 2>/dev/null"))
-	if strings.TrimSpace(ours) != "" {
+	port := e.cfg.App.ListenPort()
+	ours, _ := e.client.Output(ctx, e.inApp(compose+" port nginx 80 2>/dev/null"))
+	if strings.HasSuffix(strings.TrimSpace(strings.SplitN(ours, "\n", 2)[0]), fmt.Sprintf(":%d", port)) {
 		return nil
 	}
-	listening, _ := e.client.Output(ctx, "ss -Hltn 'sport = :80' 2>/dev/null")
+	listening, _ := e.client.Output(ctx, fmt.Sprintf("ss -Hltn 'sport = :%d' 2>/dev/null", port))
 	if strings.TrimSpace(listening) != "" {
-		return errors.New("port 80 on the server is already in use by another process or app. " +
-			"Ship supports one app per server for now and will not stop anything it did not start")
+		return fmt.Errorf("port %d on the server is already in use by another process or app. "+
+			"Ship will not stop anything it did not start. Set app.public_port to a free port", port)
 	}
 	return nil
 }
@@ -190,6 +192,9 @@ func (e *Executor) uploadSourceCode(ctx context.Context) error {
 const dockerignoreRules = `
 # Added by Ship: keep secrets out of the image
 .git
+# Ship's own files; the log changes on every build and would defeat the cache
+deploy.log
+.ship.lock
 **/.env
 **/.env.*
 **/*.env
@@ -206,8 +211,21 @@ func (e *Executor) writeDeploymentFiles(ctx context.Context) error {
 		return fmt.Errorf("reading .dockerignore: %w", err)
 	}
 
+	rules, err := sshclient.LoadIgnore(e.localDir)
+	if err != nil {
+		return err
+	}
+	ignore := string(existing) + dockerignoreRules
+	// Files the user chose to upload must also reach the image.
+	for _, p := range rules.Include {
+		if !strings.Contains(p, "/") {
+			p = "**/" + p
+		}
+		ignore += "!" + p + "\n"
+	}
+
 	files := []struct{ name, content string }{
-		{".dockerignore", string(existing) + dockerignoreRules},
+		{".dockerignore", ignore},
 		{"Dockerfile", e.plan.Dockerfile}, // empty: keep the one from the source upload
 		{composeFile, e.plan.DockerCompose},
 		{"nginx.conf", e.NginxConfig()},
@@ -353,15 +371,18 @@ func (e *Executor) verifyApp(ctx context.Context) error {
 
 // healthCheckURL probes the server itself, so a domain that points somewhere
 // else cannot make a broken deploy look healthy.
-func healthCheckURL(serverHost string) string {
-	if strings.Count(serverHost, ":") > 1 { // bare IPv6 address
+func healthCheckURL(serverHost string, port int) string {
+	if strings.Count(serverHost, ":") > 1 && !strings.HasPrefix(serverHost, "[") { // bare IPv6 address
 		serverHost = "[" + serverHost + "]"
+	}
+	if port != 80 {
+		serverHost += ":" + strconv.Itoa(port)
 	}
 	return "http://" + serverHost
 }
 
 func (e *Executor) healthCheck(ctx context.Context) error {
-	url := healthCheckURL(e.cfg.Server.Host)
+	url := healthCheckURL(e.cfg.Server.Host, e.cfg.App.ListenPort())
 
 	// Don't follow redirects — a 3xx from the app counts as "app is up"
 	client := &http.Client{
@@ -393,7 +414,7 @@ func (e *Executor) healthCheck(ctx context.Context) error {
 			return err
 		}
 	}
-	return fmt.Errorf("health check failed for %s: %w", url, lastErr)
+	return fmt.Errorf("health check failed for %s (is port %d open in the server's firewall?): %w", url, e.cfg.App.ListenPort(), lastErr)
 }
 
 func sleep(ctx context.Context, d time.Duration) error {

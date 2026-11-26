@@ -24,8 +24,8 @@ func TestDockerfilePerLanguage(t *testing.T) {
 		{"ruby default", &detector.ProjectInfo{Language: "Ruby", Port: 3000}, []string{"FROM ruby:3.3-slim", `CMD ["bundle", "exec", "puma", "-C", "config/puma.rb"]`}},
 		{"ruby sinatra", &detector.ProjectInfo{Language: "Ruby", Framework: "Sinatra", Port: 3000}, []string{`CMD ["bundle", "exec", "ruby", "app.rb"]`}},
 		{"java", &detector.ProjectInfo{Language: "Java", Port: 8080}, []string{"eclipse-temurin", "mvn package -DskipTests", "app.jar"}},
-		{"rust", &detector.ProjectInfo{Language: "Rust", Port: 8080}, []string{"FROM rust:1.82-alpine AS builder", "cargo build --release"}},
-		{"php", &detector.ProjectInfo{Language: "PHP", Port: 8000}, []string{"FROM php:8.3-fpm-alpine", `CMD ["php-fpm"]`}},
+		{"rust", &detector.ProjectInfo{Language: "Rust", Port: 8080}, []string{"FROM rust:1-alpine AS builder", "cargo build --release"}},
+		{"php", &detector.ProjectInfo{Language: "PHP", Port: 8000}, []string{"FROM php:8.3-apache", `CMD ["apache2-foreground"]`}},
 		{"unknown falls back to generic", &detector.ProjectInfo{Language: "Unknown", Port: 8080}, []string{"FROM ubuntu:24.04", `CMD ["./start.sh"]`}},
 	}
 

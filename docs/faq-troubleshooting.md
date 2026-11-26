@@ -9,7 +9,7 @@ Run `ship init` in your project. Ship looks in the current directory and its par
 ## SSH connection fails
 
 - Confirm the key at `server.key_path` is in `~/.ssh/authorized_keys` on the server.
-- Passphrase-protected keys are not supported yet.
+- For a passphrase-protected key, `ssh-add <path>` avoids being asked each time.
 - **Unknown server**: run `ship connect` and check the fingerprint before accepting it.
 - **HOST KEY CHANGED**: someone may be intercepting the connection. If you know you rebuilt the server, run the `ssh-keygen -R` command shown in the error.
 
@@ -19,13 +19,13 @@ Ship does not install them. Follow the [Docker Engine install guide](https://doc
 
 ## "port 80 on the server is already in use"
 
-Something Ship did not start is listening on port 80, such as a host nginx or another app. Ship will not stop it. Free the port or use another server. Several apps per server are not supported yet.
+Something Ship did not start is listening on port 80, such as a host nginx or another app. Ship will not stop it. Free the port, or set `app.public_port` (for example 8090) and open it in your firewall. Running several Ship apps on one server is not fully supported yet.
 
 ## The build fails
 
 The build output is shown as it runs and saved to `~/ship/<app-name>/deploy.log`. Your running containers are not changed. Common causes: the generated Dockerfile does not suit your project layout (add your own Dockerfile and keep it when asked), or the server is out of disk or memory.
 
-A file you need may have been excluded from the upload; see [what is uploaded](configuration.md#what-is-uploaded).
+A file you need may have been excluded from the upload; see [what is uploaded](configuration.md#what-is-uploaded) and `.shipignore`. `ship logs --build` shows the last build output again.
 
 ## "the app container is not staying up"
 

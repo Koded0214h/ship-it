@@ -23,7 +23,12 @@ import (
 
 const aiTimeout = 3 * time.Minute
 
-var noAI bool
+var (
+	noAI       bool
+	assumeYes  bool
+	dryRun     bool
+	describeAs string
+)
 
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
@@ -31,12 +36,19 @@ var deployCmd = &cobra.Command{
 	Long: `Deploy the project that contains .ship/config.yaml to your server.
 
 Ship shows the files it will use and asks before doing anything. The new image
-is built while the current containers keep running. HTTPS is not supported yet.`,
+is built while the current containers keep running. HTTPS is not supported yet.
+
+With --yes nothing is asked: your own Dockerfile is kept, app.port is used, and
+a failed AI plan stops the deploy. An unknown server is still refused, so run
+'ship connect' once first.`,
 	RunE: runDeploy,
 }
 
 func init() {
 	deployCmd.Flags().BoolVar(&noAI, "no-ai", false, "use the built-in templates even if an AI provider is configured")
+	deployCmd.Flags().BoolVarP(&assumeYes, "yes", "y", false, "do not ask questions (for scripts)")
+	deployCmd.Flags().BoolVar(&dryRun, "dry-run", false, "show the plan without connecting or changing anything")
+	deployCmd.Flags().StringVar(&describeAs, "describe", "", "deployment description for the AI provider, instead of being asked")
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
@@ -64,7 +76,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	if !fromTemplate {
 		plan, err = aiPlan(ctx, cfg, info, root)
 		if err != nil {
-			if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil {
+			if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil || assumeYes {
 				return err
 			}
 			fmt.Println(ui.ErrorStyle.Render("The AI plan could not be used: " + sanitize(err.Error())))
@@ -107,19 +119,29 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		}
 	}
 
+	if plan.DockerCompose, err = deploy.SetPublicPort(plan.DockerCompose, cfg.App.PublicPort); err != nil {
+		return err
+	}
+
 	// Step 4: Show exactly what will be used, then confirm.
 	preview := deploy.New(nil, cfg, plan, root, info.Port)
 	printPlan(plan, preview, fromTemplate)
 
-	confirmed, err := askYesNo(
-		fmt.Sprintf("Deploy %s to %s@%s?", cfg.App.Name, cfg.Server.User, cfg.Server.Host),
-		"Check the files above. Containers are replaced only after a successful build.")
-	if err != nil {
-		return err
-	}
-	if !confirmed {
-		fmt.Println(ui.MutedStyle.Render("Deploy cancelled."))
+	if dryRun {
+		fmt.Println(ui.MutedStyle.Render("Dry run: nothing was uploaded or changed."))
 		return nil
+	}
+	if !assumeYes {
+		confirmed, err := askYesNo(
+			fmt.Sprintf("Deploy %s to %s@%s?", cfg.App.Name, cfg.Server.User, cfg.Server.Host),
+			"Check the files above. Containers are replaced only after a successful build.")
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			fmt.Println(ui.MutedStyle.Render("Deploy cancelled."))
+			return nil
+		}
 	}
 
 	if fromTemplate && plan.Domain != cfg.App.Domain {
@@ -133,7 +155,7 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 	fmt.Println()
 	fmt.Println(ui.BrandStyle.Render("Deploying to " + cfg.Server.Host + "..."))
 
-	client, err := connect(cfg)
+	client, err := connectWith(cfg, !assumeYes)
 	if err != nil {
 		return fmt.Errorf("SSH connect: %w", err)
 	}
@@ -167,6 +189,9 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		host = plan.Domain
 	}
 	fmt.Println(ui.SuccessStyle.Render("✓ Deployed successfully!"))
+	if port := cfg.App.ListenPort(); port != 80 {
+		host = fmt.Sprintf("%s:%d", host, port)
+	}
 	fmt.Println(ui.BrandStyle.Render("  http://" + host))
 	return nil
 }
@@ -175,6 +200,10 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 // was detected.
 func resolvePort(cfg *config.Config, info *detector.ProjectInfo) error {
 	if cfg.App.Port == 0 || cfg.App.Port == info.Port {
+		return nil
+	}
+	if assumeYes || dryRun {
+		info.Port = cfg.App.Port
 		return nil
 	}
 	port := cfg.App.Port
@@ -207,7 +236,10 @@ func aiPlan(ctx context.Context, cfg *config.Config, info *detector.ProjectInfo,
 		return nil, err
 	}
 
-	var userPrompt string
+	userPrompt := strings.TrimSpace(describeAs)
+	if userPrompt == "" && assumeYes {
+		return nil, errors.New("--yes with an AI provider needs --describe (or use --no-ai)")
+	}
 	promptForm := huh.NewForm(
 		huh.NewGroup(
 			huh.NewText().
@@ -223,8 +255,10 @@ func aiPlan(ctx context.Context, cfg *config.Config, info *detector.ProjectInfo,
 				}),
 		),
 	)
-	if err := promptForm.Run(); err != nil {
-		return nil, err
+	if userPrompt == "" {
+		if err := promptForm.Run(); err != nil {
+			return nil, err
+		}
 	}
 
 	fmt.Println()
@@ -245,6 +279,10 @@ func aiPlan(ctx context.Context, cfg *config.Config, info *detector.ProjectInfo,
 // chooseDockerfile asks whether to keep a Dockerfile the project already has.
 func chooseDockerfile(plan *ai.DeploymentPlan, root string) error {
 	if _, err := os.Stat(filepath.Join(root, "Dockerfile")); err != nil || plan.Dockerfile == "" {
+		return nil
+	}
+	if assumeYes || dryRun {
+		plan.Dockerfile = ""
 		return nil
 	}
 	keep := true
@@ -273,6 +311,9 @@ func askYesNo(title, description string) (bool, error) {
 
 func deterministicPlan(info *detector.ProjectInfo, cfg *config.Config) (*ai.DeploymentPlan, error) {
 	domain := cfg.App.Domain
+	if assumeYes || dryRun {
+		return generator.BuildPlan(info, cfg.App.Name, domain), nil
+	}
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().

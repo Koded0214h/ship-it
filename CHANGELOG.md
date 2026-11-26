@@ -15,6 +15,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 - The local project path is no longer sent to AI providers.
 
 ### Fixed
+- Generated Dockerfiles for Node (npm, pnpm, build step), Python (Flask, FastAPI, Django, Pipenv, pyproject), Go (including `cmd/`), Rust, Java Maven, Ruby and PHP now build and serve the apps in `examples/`. Before, only a flat Go app did.
 - Deploys no longer stop and remove every container on the server, or prune the build cache.
 - A failed build or crashing app is reported as a failure, with a non-zero exit code.
 - Images are built before running containers are replaced.
@@ -34,6 +35,14 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 - `ship deploy --no-ai`, and an offer to use the template when the AI provider fails.
+- `ship deploy --dry-run`, `--yes` and `--describe`.
+- ssh-agent and passphrase-protected keys.
+- `.shipignore`.
+- `ship doctor` checks DNS against the server, disk space and container state.
+- `ship init` accepts an `~/.ssh/config` alias and a typed key path.
+- `app.public_port`, to run beside a server already using port 80. The app container no longer publishes a host port.
+- `ship status`, and `ship logs --tail/--service/--no-follow/--build`.
+- The install script verifies release checksums.
 - Deterministic fallback for language/framework detection when no AI provider is configured.
 - Open-source project scaffolding: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, issue/PR templates.
 

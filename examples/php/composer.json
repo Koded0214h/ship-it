@@ -1,0 +1,6 @@
+{
+  "name": "example/hello",
+  "require": {
+    "php": ">=8.2"
+  }
+}

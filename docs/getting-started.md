@@ -11,15 +11,15 @@ You need a Linux VPS (Ubuntu is the target) with:
 - Docker Engine and Compose v2 ([install guide](https://docs.docker.com/engine/install/)). Ship does not install them.
 - An SSH user that can run `docker` without `sudo`.
 - `bash` and `flock` (present on Ubuntu).
-- Port 80 free and reachable. One app per server for now.
+- Port 80 free and reachable, or another port set as `app.public_port`.
 
 ## `ship init`
 
 Run this once per project, from the project root.
 
 1. **App details**: app name and an optional domain.
-2. **Server details**: the VPS host/IP and SSH user.
-3. **SSH key**: pick one from `~/.ssh`, or let Ship generate `~/.ssh/ship_ed25519`. An existing key is never overwritten.
+2. **Server details**: an IP, hostname or `~/.ssh/config` alias, and the SSH user. For an alias, Ship offers to copy its host, user, port and key. Jump hosts and proxy commands are not supported.
+3. **SSH key**: pick one, type a path, or let Ship generate `~/.ssh/ship_ed25519`. An existing key is never overwritten.
 4. **AI provider** (optional): Anthropic, OpenAI or Google Gemini with an API key, or skip.
 
 This writes `.ship/config.yaml` and adds `.ship/` to `.gitignore`. See [Configuration](configuration.md).
@@ -39,17 +39,24 @@ The first time, Ship shows the server's host key fingerprint and asks whether to
 5. On the server: checks requirements, takes a lock, uploads source, writes files, builds images, and only then replaces containers.
 6. Checks that the app container stays up and that port 80 answers.
 
+| Flag | Effect |
+|---|---|
+| `--no-ai` | Use the built-in templates |
+| `--dry-run` | Show the plan; connect to nothing and change nothing. With AI configured, the plan request is still sent to the provider |
+| `--yes`, `-y` | Ask nothing: keep your Dockerfile, use `app.port`, stop if the AI plan fails. Run `ship connect` once first, since unknown servers are still refused. Protected keys must be in ssh-agent |
+| `--describe "..."` | The description for the AI provider (required with `--yes` when AI is configured) |
+
 A failed deploy exits non-zero. If the **build** fails, running containers are not changed. If the new containers fail **after** starting, there is no automatic rollback yet.
 
 HTTPS and CI/CD generation are not supported yet.
 
 ## `ship doctor`
 
-Checks config, SSH, Docker and Compose, your AI key (if set), and whether your domain answers over HTTP. Exits non-zero if a check fails.
+Checks config, SSH, Docker and Compose, free disk, the app's containers, your AI key (if set), whether your domain's DNS points at the server, and whether the app answers from your machine. It only reads from the server, and exits non-zero if a check fails.
 
-## `ship logs`
+## `ship logs` and `ship status`
 
-Streams the last 100 lines and follows. `Ctrl+C` to stop.
+`ship logs` streams the last 100 lines and follows; `Ctrl+C` stops. Options: `--tail N`, `--service app`, `--no-follow`, and `--build` for the last image build. `ship status` lists the app's containers.
 
 ## `ship config`
 

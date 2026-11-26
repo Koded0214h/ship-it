@@ -1,13 +1,16 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 
 	"github.com/Koded0214h/ship/internal/config"
 	"github.com/Koded0214h/ship/internal/detector"
+	"github.com/Koded0214h/ship/internal/sshconfig"
 	"github.com/Koded0214h/ship/internal/sshkey"
 	"github.com/Koded0214h/ship/internal/ui"
 	"github.com/charmbracelet/huh"
@@ -65,23 +68,34 @@ func runInit(cmd *cobra.Command, args []string) error {
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Server host").
-				Description("IP address or hostname of your VPS").
-				Placeholder("123.456.789.0").
+				Description("IP address, hostname, or an alias from your ~/.ssh/config").
+				Placeholder("203.0.113.10").
 				Value(&cfg.Server.Host).
 				Validate(config.ValidateHost),
-			huh.NewInput().
-				Title("SSH user").
-				Placeholder("ubuntu").
-				Value(&cfg.Server.User).
-				Validate(config.ValidateUser),
 		),
 	)
 	if err := step1.Run(); err != nil {
 		return err
 	}
 
+	suggestedKey, err := useSSHAlias(cmd.Context(), cfg)
+	if err != nil {
+		return err
+	}
+
+	userForm := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("SSH user").
+			Placeholder("ubuntu").
+			Value(&cfg.Server.User).
+			Validate(config.ValidateUser),
+	))
+	if err := userForm.Run(); err != nil {
+		return err
+	}
+
 	// Step 2: SSH key — detect, pick, or generate
-	keyPath, err := resolveSSHKey()
+	keyPath, err := resolveSSHKey(suggestedKey)
 	if err != nil {
 		return err
 	}
@@ -148,18 +162,42 @@ func runInit(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-const generateOption = "__generate__"
+// useSSHAlias offers to fill in the connection from ~/.ssh/config and returns
+// the key configured there, if any.
+func useSSHAlias(ctx context.Context, cfg *config.Config) (string, error) {
+	host, ok := sshconfig.Lookup(ctx, cfg.Server.Host)
+	if !ok || config.ValidateHost(host.HostName) != nil {
+		return "", nil
+	}
+	if host.Proxied {
+		fmt.Println(ui.WarningStyle.Render("⚠ This alias uses a jump host or proxy command, which Ship does not support."))
+	}
+	use, err := askYesNo(fmt.Sprintf("Use the SSH config entry %q?", cfg.Server.Host),
+		fmt.Sprintf("host %s, user %s, port %d. Ship saves these values, not the alias.", host.HostName, host.User, host.Port))
+	if err != nil || !use {
+		return "", err
+	}
+	cfg.Server.Host = host.HostName
+	cfg.Server.User = host.User
+	if host.Port > 0 {
+		cfg.Server.Port = host.Port
+	}
+	return host.IdentityFile, nil
+}
 
-func resolveSSHKey() (string, error) {
+const (
+	generateOption = "__generate__"
+	typeOption     = "__type__"
+)
+
+// resolveSSHKey lets the user choose a key, listing the suggested one first.
+func resolveSSHKey(suggested string) (string, error) {
 	existing := sshkey.FindExisting()
-
-	if len(existing) == 0 {
-		// No keys found — generate automatically
-		return generateKey()
+	if suggested != "" && !slices.Contains(existing, suggested) {
+		existing = append([]string{suggested}, existing...)
 	}
 
-	// Build options: existing keys + generate new
-	opts := make([]huh.Option[string], 0, len(existing)+1)
+	opts := make([]huh.Option[string], 0, len(existing)+2)
 	for _, p := range existing {
 		opts = append(opts, huh.NewOption(p, p))
 	}
@@ -167,8 +205,9 @@ func resolveSSHKey() (string, error) {
 	if !slices.ContainsFunc(existing, func(p string) bool { return filepath.Base(p) == "ship_ed25519" }) {
 		opts = append(opts, huh.NewOption("Generate a new key for me", generateOption))
 	}
+	opts = append(opts, huh.NewOption("Enter a path to another key", typeOption))
 
-	var choice string
+	choice := suggested
 	form := huh.NewForm(
 		huh.NewGroup(
 			huh.NewSelect[string]().
@@ -182,10 +221,35 @@ func resolveSSHKey() (string, error) {
 		return "", err
 	}
 
-	if choice == generateOption {
+	switch choice {
+	case generateOption:
 		return generateKey()
+	case typeOption:
+		return askKeyPath()
 	}
 	return choice, nil
+}
+
+func askKeyPath() (string, error) {
+	var path string
+	err := huh.NewForm(huh.NewGroup(
+		huh.NewInput().
+			Title("Path to your private SSH key").
+			Value(&path).
+			Validate(validKeyPath),
+	)).Run()
+	return path, err
+}
+
+func validKeyPath(path string) error {
+	info, err := os.Stat(expandKeyPath(path))
+	if err != nil || info.IsDir() {
+		return fmt.Errorf("no key file at that path")
+	}
+	if strings.HasSuffix(path, ".pub") {
+		return fmt.Errorf("that is the public key; give the private key (without .pub)")
+	}
+	return nil
 }
 
 func generateKey() (string, error) {

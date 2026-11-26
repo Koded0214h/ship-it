@@ -40,7 +40,7 @@ Your VPS
 
 - **`internal/config`** — reads, writes and validates `.ship/config.yaml`.
 
-- **`cmd/`** — Cobra commands (`init`, `connect`, `deploy`, `doctor`, `logs`, `config`), mostly interactive via `huh`.
+- **`cmd/`** — Cobra commands (`init`, `connect`, `deploy`, `doctor`, `logs`, `status`, `config`), interactive via `huh`; `deploy` and `logs` also take flags.
 
 ## Where credentials go
 
