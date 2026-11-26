@@ -8,6 +8,7 @@ and this project follows [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Security
+- Built with Go 1.26.11 and updated modules, fixing known vulnerabilities in the standard library, `golang.org/x/crypto`, `x/net` and others.
 - SSH host keys are verified against `known_hosts`; new servers must be confirmed and changed keys are refused.
 - `.env` files and private keys are no longer uploaded or baked into images. `v0.1.0` uploaded them; remove any left in `~/ship/<app>` and rotate what was exposed.
 - App name, domain, host, user and ports are validated before being used in remote commands.

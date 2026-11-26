@@ -24,7 +24,7 @@ frontend/           Marketing site (React + Vite), not shipped in the CLI binary
 
 ## Development setup
 
-**Requirements:** Go 1.26+ (see `go.mod`), and Node 18+ if you're working on `frontend/`.
+**Requirements:** Go 1.26.11+ (see `go.mod`), and Node 18+ if you're working on `frontend/`.
 
 ```bash
 git clone https://github.com/Koded0214h/ship.git
