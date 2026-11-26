@@ -2,116 +2,119 @@ package cmd
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
+	"unicode"
 
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/Koded0214h/ship/internal/ai"
 	"github.com/Koded0214h/ship/internal/config"
 	"github.com/Koded0214h/ship/internal/deploy"
 	"github.com/Koded0214h/ship/internal/detector"
 	"github.com/Koded0214h/ship/internal/generator"
-	sshclient "github.com/Koded0214h/ship/internal/ssh"
 	"github.com/Koded0214h/ship/internal/ui"
+	"github.com/charmbracelet/huh"
 	"github.com/spf13/cobra"
 )
+
+const aiTimeout = 3 * time.Minute
+
+var noAI bool
 
 var deployCmd = &cobra.Command{
 	Use:   "deploy",
 	Short: "Deploy your application to your VPS",
-	RunE:  runDeploy,
+	Long: `Deploy the project that contains .ship/config.yaml to your server.
+
+Ship shows the files it will use and asks before doing anything. The new image
+is built while the current containers keep running. HTTPS is not supported yet.`,
+	RunE: runDeploy,
+}
+
+func init() {
+	deployCmd.Flags().BoolVar(&noAI, "no-ai", false, "use the built-in templates even if an AI provider is configured")
 }
 
 func runDeploy(cmd *cobra.Command, args []string) error {
-	cfg, err := config.Load()
+	ctx := cmd.Context()
+	cfg, root, err := loadValidConfig()
 	if err != nil {
 		return err
-	}
-	if errs := config.Validate(cfg); len(errs) > 0 {
-		fmt.Println(ui.ErrorStyle.Render("Config errors:"))
-		for _, e := range errs {
-			fmt.Println("  " + ui.ErrorStyle.Render("• "+e))
-		}
-		return fmt.Errorf("invalid config — run 'ship init' to reconfigure")
 	}
 
 	// Step 1: Detect project
 	fmt.Println(ui.BrandStyle.Render("Analyzing project..."))
-	cwd, _ := os.Getwd()
-	info, err := detector.Detect(cwd)
+	info, err := detector.Detect(root)
 	if err != nil {
 		return fmt.Errorf("project detection: %w", err)
 	}
-
+	if err := resolvePort(cfg, info); err != nil {
+		return err
+	}
 	printProjectSummary(info)
 
-	// Step 2 + 3: Build the deployment plan — deterministically when no key is set,
-	// otherwise via the configured AI provider.
+	// Step 2: Build the plan — from templates, or from the configured AI provider.
 	fmt.Println()
 	var plan *ai.DeploymentPlan
-	if cfg.AI.APIKey == "" {
+	fromTemplate := noAI || cfg.AI.APIKey == ""
+	if !fromTemplate {
+		plan, err = aiPlan(ctx, cfg, info, root)
+		if err != nil {
+			if errors.Is(err, huh.ErrUserAborted) || ctx.Err() != nil {
+				return err
+			}
+			fmt.Println(ui.ErrorStyle.Render("The AI plan could not be used: " + sanitize(err.Error())))
+			ok, askErr := askYesNo("Continue with Ship's built-in template instead?",
+				"The template does not use your written description.")
+			if askErr != nil {
+				return askErr
+			}
+			if !ok {
+				return fmt.Errorf("generating plan: %w", err)
+			}
+			fromTemplate = true
+		}
+	}
+	if fromTemplate {
 		plan, err = deterministicPlan(info, cfg)
 		if err != nil {
 			return err
 		}
-	} else {
-		var userPrompt string
-		promptForm := huh.NewForm(
-			huh.NewGroup(
-				huh.NewText().
-					Title("Describe your deployment").
-					Description("Tell Ship what you want. E.g: 'Deploy with PostgreSQL and Redis. Enable HTTPS. Deploy on push to main.'").
-					Placeholder("Deploy my app with PostgreSQL, enable HTTPS, and set up CI/CD with GitHub Actions.").
-					Value(&userPrompt).
-					Validate(func(s string) error {
-						if strings.TrimSpace(s) == "" {
-							return fmt.Errorf("please describe your deployment")
-						}
-						return nil
-					}),
-			),
-		)
-		if err := promptForm.Run(); err != nil {
+		if err := deploy.ValidatePlan(plan, root); err != nil {
 			return err
 		}
+	}
 
-		fmt.Println()
-		plan, err = runWithSpinner("Generating deployment plan", func() (*ai.DeploymentPlan, error) {
-			provider, err := ai.New(cfg.AI.Provider, cfg.AI.APIKey, cfg.AI.Model)
-			if err != nil {
-				return nil, err
-			}
-			return provider.GenerateDeploymentPlan(context.Background(), info, userPrompt)
-		})
-		if err != nil {
-			return fmt.Errorf("generating plan: %w", err)
+	if plan.SSLEnabled {
+		fmt.Println(ui.WarningStyle.Render("HTTPS is not supported yet — this will deploy over HTTP."))
+		plan.SSLEnabled = false
+	}
+	if cfg.App.Domain != "" && !fromTemplate {
+		plan.Domain = cfg.App.Domain
+	}
+
+	// Step 3: Respect the user's own files.
+	if err := chooseDockerfile(plan, root); err != nil {
+		return err
+	}
+	for _, name := range []string{"docker-compose.yml", "docker-compose.yaml", "compose.yml", "compose.yaml"} {
+		if _, err := os.Stat(filepath.Join(root, name)); err == nil {
+			fmt.Println(ui.WarningStyle.Render("Note: " + name + " is not used. Ship deploys with the compose file shown below; your local copy is not changed."))
 		}
 	}
 
-	// Step 4: Show plan
-	fmt.Println()
-	if err := renderPlan(plan, cfg); err != nil {
-		fmt.Println(ui.ErrorStyle.Render("Warning: could not render plan markdown: " + err.Error()))
-		printPlanFallback(plan)
-	}
+	// Step 4: Show exactly what will be used, then confirm.
+	preview := deploy.New(nil, cfg, plan, root, info.Port)
+	printPlan(plan, preview, fromTemplate)
 
-	// Step 5: Confirm
-	fmt.Println()
-	var confirmed bool
-	confirmForm := huh.NewForm(
-		huh.NewGroup(
-			huh.NewConfirm().
-				Title("Deploy this plan?").
-				Description("Ship will execute these steps on your server.").
-				Value(&confirmed),
-		),
-	)
-	if err := confirmForm.Run(); err != nil {
+	confirmed, err := askYesNo(
+		fmt.Sprintf("Deploy %s to %s@%s?", cfg.App.Name, cfg.Server.User, cfg.Server.Host),
+		"Check the files above. Containers are replaced only after a successful build.")
+	if err != nil {
 		return err
 	}
 	if !confirmed {
@@ -119,73 +122,153 @@ func runDeploy(cmd *cobra.Command, args []string) error {
 		return nil
 	}
 
-	if cfg.AI.APIKey == "" && plan.Domain != cfg.App.Domain {
+	if fromTemplate && plan.Domain != cfg.App.Domain {
 		cfg.App.Domain = plan.Domain
 		if err := config.Save(cfg); err != nil {
 			fmt.Println(ui.WarningStyle.Render("Warning: could not save domain to config: " + err.Error()))
 		}
 	}
 
-	// Step 6: Save GitHub Actions workflow locally
-	if plan.GitHubActions != "" {
-		localPath := ".github/workflows/deploy.yml"
-		if err := os.MkdirAll(filepath.Dir(localPath), 0755); err == nil {
-			if err := os.WriteFile(localPath, []byte(plan.GitHubActions), 0644); err == nil {
-				fmt.Println(ui.SuccessStyle.Render("✓ GitHub Actions workflow saved to " + localPath))
-			}
-		}
-	}
-
-	// Step 7: Connect and deploy
+	// Step 5: Connect and deploy
 	fmt.Println()
 	fmt.Println(ui.BrandStyle.Render("Deploying to " + cfg.Server.Host + "..."))
 
-	client, err := sshclient.Connect(sshclient.Config{
-		Host:    cfg.Server.Host,
-		User:    cfg.Server.User,
-		KeyPath: cfg.Server.KeyPath,
-		Port:    cfg.Server.Port,
-	})
+	client, err := connect(cfg)
 	if err != nil {
 		return fmt.Errorf("SSH connect: %w", err)
 	}
 	defer client.Close()
 
-	executor := deploy.New(client, cfg, plan, cwd, info.Port)
-	results := executor.Run(func(name string) {
+	executor := deploy.New(client, cfg, plan, root, info.Port)
+	executor.Out = os.Stdout
+	results := executor.Run(ctx, func(name string) {
 		fmt.Printf("  %s %s\n", ui.Arrow, name)
 	})
 
-	// Step 8: Results
+	// Step 6: Results
 	fmt.Println()
-	allOk := true
+	var failure error
 	for _, r := range results {
 		if r.Success {
 			fmt.Printf("  %s %s\n", ui.CheckMark, r.Name)
 		} else {
 			fmt.Printf("  %s %s: %v\n", ui.CrossMark, r.Name, r.Err)
-			allOk = false
+			failure = fmt.Errorf("deployment failed at step %q", r.Name)
 		}
 	}
 
 	fmt.Println()
-	if allOk {
-		host := cfg.Server.Host
-		if plan.Domain != "" {
-			host = plan.Domain
+	if failure != nil {
+		fmt.Println(ui.MutedStyle.Render("  Run 'ship logs' for container output or 'ship doctor' to check the server."))
+		return failure
+	}
+	host := cfg.Server.Host
+	if plan.Domain != "" {
+		host = plan.Domain
+	}
+	fmt.Println(ui.SuccessStyle.Render("✓ Deployed successfully!"))
+	fmt.Println(ui.BrandStyle.Render("  http://" + host))
+	return nil
+}
+
+// resolvePort makes app.port authoritative, asking when it disagrees with what
+// was detected.
+func resolvePort(cfg *config.Config, info *detector.ProjectInfo) error {
+	if cfg.App.Port == 0 || cfg.App.Port == info.Port {
+		return nil
+	}
+	port := cfg.App.Port
+	err := huh.NewForm(huh.NewGroup(
+		huh.NewSelect[int]().
+			Title("Which port does your app listen on?").
+			Description("Your config and the detected framework default disagree. Change app.port with 'ship config'.").
+			Options(
+				huh.NewOption(fmt.Sprintf("%d — from .ship/config.yaml", cfg.App.Port), cfg.App.Port),
+				huh.NewOption(fmt.Sprintf("%d — usual port for %s", info.Port, info.Framework), info.Port),
+			).
+			Value(&port),
+	)).Run()
+	if err != nil {
+		return err
+	}
+	if port != cfg.App.Port {
+		cfg.App.Port = port
+		if err := config.Save(cfg); err != nil {
+			return fmt.Errorf("saving config: %w", err)
 		}
-		scheme := "http"
-		if plan.SSLEnabled {
-			scheme = "https"
-		}
-		fmt.Println(ui.SuccessStyle.Render("✓ Deployed successfully!"))
-		fmt.Println(ui.BrandStyle.Render(fmt.Sprintf("  %s://%s", scheme, host)))
-	} else {
-		fmt.Println(ui.ErrorStyle.Render("✗ Deployment completed with errors."))
-		fmt.Println(ui.MutedStyle.Render("  Run 'ship doctor' to diagnose issues."))
+	}
+	info.Port = port
+	return nil
+}
+
+func aiPlan(ctx context.Context, cfg *config.Config, info *detector.ProjectInfo, root string) (*ai.DeploymentPlan, error) {
+	provider, err := ai.New(cfg.AI.Provider, cfg.AI.APIKey, cfg.AI.Model)
+	if err != nil {
+		return nil, err
 	}
 
+	var userPrompt string
+	promptForm := huh.NewForm(
+		huh.NewGroup(
+			huh.NewText().
+				Title("Describe your deployment").
+				Description("This text and your project's language, framework, port, services and manifest file names are sent to " + provider.Name() + ". Don't include secrets.").
+				Placeholder("Deploy my app with PostgreSQL and Redis.").
+				Value(&userPrompt).
+				Validate(func(s string) error {
+					if strings.TrimSpace(s) == "" {
+						return fmt.Errorf("please describe your deployment")
+					}
+					return nil
+				}),
+		),
+	)
+	if err := promptForm.Run(); err != nil {
+		return nil, err
+	}
+
+	fmt.Println()
+	ctx, cancel := context.WithTimeout(ctx, aiTimeout)
+	defer cancel()
+	plan, err := runWithSpinner("Generating deployment plan", func() (*ai.DeploymentPlan, error) {
+		return provider.GenerateDeploymentPlan(ctx, info, userPrompt)
+	})
+	if err != nil {
+		return nil, err
+	}
+	if err := deploy.ValidatePlan(plan, root); err != nil {
+		return nil, fmt.Errorf("the generated plan was rejected: %w", err)
+	}
+	return plan, nil
+}
+
+// chooseDockerfile asks whether to keep a Dockerfile the project already has.
+func chooseDockerfile(plan *ai.DeploymentPlan, root string) error {
+	if _, err := os.Stat(filepath.Join(root, "Dockerfile")); err != nil || plan.Dockerfile == "" {
+		return nil
+	}
+	keep := true
+	err := huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().
+			Title("Use your existing Dockerfile?").
+			Description("No replaces it on the server with a generated one. Your local file is not changed.").
+			Value(&keep),
+	)).Run()
+	if err != nil {
+		return err
+	}
+	if keep {
+		plan.Dockerfile = ""
+	}
 	return nil
+}
+
+func askYesNo(title, description string) (bool, error) {
+	var yes bool // defaults to No
+	err := huh.NewForm(huh.NewGroup(
+		huh.NewConfirm().Title(title).Description(description).Value(&yes),
+	)).Run()
+	return yes, err
 }
 
 func deterministicPlan(info *detector.ProjectInfo, cfg *config.Config) (*ai.DeploymentPlan, error) {
@@ -194,15 +277,21 @@ func deterministicPlan(info *detector.ProjectInfo, cfg *config.Config) (*ai.Depl
 		huh.NewGroup(
 			huh.NewInput().
 				Title("Domain (optional)").
-				Description("Leave blank to deploy on your server's IP address. Deterministic mode deploys over HTTP for now.").
+				Description("Leave blank to deploy on your server's IP address. Ship deploys over HTTP for now.").
 				Placeholder("api.example.com").
-				Value(&domain),
+				Value(&domain).
+				Validate(func(s string) error {
+					if s == "" {
+						return nil
+					}
+					return config.ValidateDomain(s)
+				}),
 		),
 	)
 	if err := form.Run(); err != nil {
 		return nil, err
 	}
-	return generator.BuildPlan(info, cfg.App.Name, cfg.Server.User, domain, false), nil
+	return generator.BuildPlan(info, cfg.App.Name, domain), nil
 }
 
 func printProjectSummary(info *detector.ProjectInfo) {
@@ -225,67 +314,63 @@ func boolYN(b bool) string {
 	return "No"
 }
 
-func renderPlan(plan *ai.DeploymentPlan, cfg *config.Config) error {
-	md := buildPlanMarkdown(plan, cfg)
-	renderer, err := glamour.NewTermRenderer(
-		glamour.WithAutoStyle(),
-		glamour.WithWordWrap(100),
-	)
-	if err != nil {
-		return err
-	}
-	out, err := renderer.Render(md)
-	if err != nil {
-		return err
-	}
-	fmt.Print(out)
-	return nil
+// sanitize removes control characters so generated or remote text cannot drive
+// the terminal (for example, to hide lines of a file under review).
+func sanitize(s string) string {
+	return strings.Map(func(r rune) rune {
+		if r == '\n' || r == '\t' {
+			return r
+		}
+		if unicode.IsControl(r) || unicode.Is(unicode.Bidi_Control, r) {
+			return -1
+		}
+		return r
+	}, s)
 }
 
-func buildPlanMarkdown(plan *ai.DeploymentPlan, cfg *config.Config) string {
-	var sb strings.Builder
-	sb.WriteString("## Deployment Plan\n\n")
+// printPlan prints the files verbatim and the steps the executor will take. The
+// steps come from Ship's code, not from the AI.
+func printPlan(plan *ai.DeploymentPlan, executor *deploy.Executor, fromTemplate bool) {
+	source := "AI-generated"
+	if fromTemplate {
+		source = "built-in template"
+	}
+	fmt.Println()
+	fmt.Println(ui.BrandStyle.Render("Deployment plan (" + source + ")"))
 	if plan.Summary != "" {
-		sb.WriteString(plan.Summary + "\n\n")
+		fmt.Println(sanitize(plan.Summary))
 	}
 
-	sb.WriteString("### Services\n\n")
-	for _, s := range plan.Services {
-		sb.WriteString(fmt.Sprintf("- %s\n", s))
+	file := func(name, content string) {
+		fmt.Println()
+		fmt.Println(ui.BoldStyle.Render("── " + name + " ──"))
+		fmt.Println(strings.TrimRight(sanitize(content), "\n"))
 	}
-
-	sb.WriteString("\n### Steps\n\n")
-	for i, s := range plan.Steps {
-		sb.WriteString(fmt.Sprintf("%d. %s\n", i+1, s))
+	if plan.Dockerfile == "" {
+		fmt.Println()
+		fmt.Println(ui.BoldStyle.Render("── Dockerfile ──") + " yours, unchanged")
+	} else {
+		file("Dockerfile", plan.Dockerfile)
 	}
-
-	if plan.SSLEnabled {
-		sb.WriteString("\n### HTTPS\n\n✓ SSL/TLS enabled via Let's Encrypt\n")
-	}
+	file("docker-compose.yml", plan.DockerCompose)
+	file("nginx.conf", executor.NginxConfig())
 
 	if len(plan.EnvVars) > 0 {
-		sb.WriteString("\n### Required Environment Variables\n\n")
-		for k, v := range plan.EnvVars {
-			sb.WriteString(fmt.Sprintf("- `%s` = `%s`\n", k, v))
+		names := make([]string, 0, len(plan.EnvVars))
+		for name := range plan.EnvVars {
+			names = append(names, sanitize(name))
 		}
+		slices.Sort(names)
+		fmt.Println()
+		fmt.Println("Server .env (written only if none exists): " + strings.Join(names, ", "))
 	}
 
-	if plan.GitHubActions != "" {
-		sb.WriteString("\n### CI/CD\n\n✓ GitHub Actions workflow will be created at `.github/workflows/deploy.yml`\n")
+	fmt.Println()
+	fmt.Println(ui.BoldStyle.Render("Steps"))
+	for i, s := range executor.StepNames() {
+		fmt.Printf("  %d. %s\n", i+1, s)
 	}
-
-	return sb.String()
-}
-
-func printPlanFallback(plan *ai.DeploymentPlan) {
-	style := lipgloss.NewStyle().Foreground(ui.Brand)
-	fmt.Println(style.Render("Deployment Plan:"))
-	if plan.Summary != "" {
-		fmt.Println(plan.Summary)
-	}
-	for i, step := range plan.Steps {
-		fmt.Printf("  %d. %s\n", i+1, step)
-	}
+	fmt.Println()
 }
 
 // runWithSpinner runs fn while showing an animated spinner line.
@@ -309,7 +394,11 @@ func runWithSpinner[T any](label string, fn func() (T, error)) (T, error) {
 		select {
 		case r := <-ch:
 			// Clear spinner line, print final status
-			fmt.Printf("\r  %s %s                    \n", ui.CheckMark, label)
+			mark := ui.CheckMark
+			if r.err != nil {
+				mark = ui.CrossMark
+			}
+			fmt.Printf("\r  %s %s                    \n", mark, label)
 			if r.err != nil {
 				var zero T
 				return zero, r.err
@@ -322,4 +411,3 @@ func runWithSpinner[T any](label string, fn func() (T, error)) (T, error) {
 		}
 	}
 }
-

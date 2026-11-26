@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/Koded0214h/ship/internal/detector"
 	"github.com/anthropics/anthropic-sdk-go"
 	"github.com/anthropics/anthropic-sdk-go/option"
-	"github.com/Koded0214h/ship/internal/detector"
 )
 
 type anthropicProvider struct {
@@ -60,12 +60,20 @@ Generate the complete deployment plan as a single JSON object.`, string(projectJ
 		return nil, fmt.Errorf("anthropic API error: %w", err)
 	}
 
-	if len(msg.Content) == 0 {
+	if msg.StopReason == anthropic.StopReasonMaxTokens {
+		return nil, fmt.Errorf("the response from Claude was cut off before the plan was complete")
+	}
+	var text strings.Builder
+	for _, block := range msg.Content {
+		if block.Type == "text" {
+			text.WriteString(block.Text)
+		}
+	}
+	if text.Len() == 0 {
 		return nil, fmt.Errorf("empty response from Claude")
 	}
 
-	raw := msg.Content[0].Text
-	raw = extractJSON(raw)
+	raw := extractJSON(text.String())
 
 	var plan DeploymentPlan
 	if err := json.Unmarshal([]byte(raw), &plan); err != nil {

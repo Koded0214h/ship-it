@@ -3,12 +3,15 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"slices"
 
-	"github.com/charmbracelet/huh"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/Koded0214h/ship/internal/config"
+	"github.com/Koded0214h/ship/internal/detector"
 	"github.com/Koded0214h/ship/internal/sshkey"
 	"github.com/Koded0214h/ship/internal/ui"
+	"github.com/charmbracelet/huh"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -21,6 +24,17 @@ var initCmd = &cobra.Command{
 func runInit(cmd *cobra.Command, args []string) error {
 	fmt.Println(ui.BrandStyle.Render("Initializing Ship..."))
 	fmt.Println()
+
+	if _, err := os.Stat(".ship/config.yaml"); err == nil {
+		ok, err := askYesNo("Replace the existing config?", ".ship/config.yaml already exists here.")
+		if err != nil {
+			return err
+		}
+		if !ok {
+			fmt.Println(ui.MutedStyle.Render("Left unchanged. Use 'ship config' to edit it."))
+			return nil
+		}
+	}
 
 	cfg := &config.Config{}
 	cfg.Server.Port = 22
@@ -35,17 +49,18 @@ func runInit(cmd *cobra.Command, args []string) error {
 				Description("A short identifier for your application (e.g. my-api)").
 				Placeholder("my-app").
 				Value(&cfg.App.Name).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("app name is required")
-					}
-					return nil
-				}),
+				Validate(config.ValidateAppName),
 			huh.NewInput().
 				Title("Domain").
 				Description("Your app's domain (e.g. api.example.com). Leave blank to use server IP.").
 				Placeholder("api.example.com").
-				Value(&cfg.App.Domain),
+				Value(&cfg.App.Domain).
+				Validate(func(s string) error {
+					if s == "" {
+						return nil
+					}
+					return config.ValidateDomain(s)
+				}),
 		),
 		huh.NewGroup(
 			huh.NewInput().
@@ -53,22 +68,12 @@ func runInit(cmd *cobra.Command, args []string) error {
 				Description("IP address or hostname of your VPS").
 				Placeholder("123.456.789.0").
 				Value(&cfg.Server.Host).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("server host is required")
-					}
-					return nil
-				}),
+				Validate(config.ValidateHost),
 			huh.NewInput().
 				Title("SSH user").
 				Placeholder("ubuntu").
 				Value(&cfg.Server.User).
-				Validate(func(s string) error {
-					if s == "" {
-						return fmt.Errorf("SSH user is required")
-					}
-					return nil
-				}),
+				Validate(config.ValidateUser),
 		),
 	)
 	if err := step1.Run(); err != nil {
@@ -123,7 +128,10 @@ func runInit(cmd *cobra.Command, args []string) error {
 		cfg.AI.Provider = aiProvider
 	}
 
-	cfg.App.Port = 8080
+	// 0 means "detect at deploy time".
+	if info, err := detector.Detect("."); err == nil {
+		cfg.App.Port = info.Port
+	}
 
 	if err := config.SaveNew(cfg); err != nil {
 		return fmt.Errorf("saving config: %w", err)
@@ -155,7 +163,10 @@ func resolveSSHKey() (string, error) {
 	for _, p := range existing {
 		opts = append(opts, huh.NewOption(p, p))
 	}
-	opts = append(opts, huh.NewOption("Generate a new key for me", generateOption))
+	// Offer generation only when it would not collide with an existing key.
+	if !slices.ContainsFunc(existing, func(p string) bool { return filepath.Base(p) == "ship_ed25519" }) {
+		opts = append(opts, huh.NewOption("Generate a new key for me", generateOption))
+	}
 
 	var choice string
 	form := huh.NewForm(
@@ -212,7 +223,9 @@ func generateKey() (string, error) {
 				Value(&ready),
 		),
 	)
-	_ = confirm.Run()
+	if err := confirm.Run(); err != nil {
+		return "", err
+	}
 
 	return info.PrivatePath, nil
 }

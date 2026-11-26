@@ -10,7 +10,7 @@ var (
 	Muted   = lipgloss.Color("#6b7280")
 	White   = lipgloss.Color("#f9fafb")
 
-	BrandStyle = lipgloss.NewStyle().Foreground(Brand).Bold(true)
+	BrandStyle   = lipgloss.NewStyle().Foreground(Brand).Bold(true)
 	SuccessStyle = lipgloss.NewStyle().Foreground(Success)
 	ErrorStyle   = lipgloss.NewStyle().Foreground(Error)
 	WarningStyle = lipgloss.NewStyle().Foreground(Warning)
@@ -23,9 +23,9 @@ var (
 		Padding(0, 1)
 
 	BoxStyle = lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(Brand).
-		Padding(0, 1)
+			Border(lipgloss.RoundedBorder()).
+			BorderForeground(Brand).
+			Padding(0, 1)
 
 	CheckMark = SuccessStyle.Render("✓")
 	CrossMark = ErrorStyle.Render("✗")

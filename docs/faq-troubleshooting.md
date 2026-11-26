@@ -1,38 +1,47 @@
 # FAQ & Troubleshooting
 
-Start with `ship doctor` — it checks your config file, SSH connection, Docker on the server, your AI provider's API key, and (if you set a domain) DNS/HTTP reachability, in that order.
+Start with `ship doctor`.
 
 ## "no .ship/config.yaml found"
 
-You haven't run `ship init` in this project (or a parent directory of it). Config is looked up by walking up from the current directory, so make sure you're inside the project you initialized.
+Run `ship init` in your project. Ship looks in the current directory and its parents.
 
 ## SSH connection fails
 
-- Confirm the key at `server.key_path` in `.ship/config.yaml` (or shown by `ship config`) exists and is the one added to `~/.ssh/authorized_keys` on your server.
-- `ship init` prints the exact `authorized_keys` line when it generates a new key — if you skipped adding it, re-run `ship connect` after adding it.
-- Ship uses `ssh.InsecureIgnoreHostKey()`, so host key mismatches aren't the problem — check the host/user/port instead.
+- Confirm the key at `server.key_path` is in `~/.ssh/authorized_keys` on the server.
+- Passphrase-protected keys are not supported yet.
+- **Unknown server**: run `ship connect` and check the fingerprint before accepting it.
+- **HOST KEY CHANGED**: someone may be intercepting the connection. If you know you rebuilt the server, run the `ssh-keygen -R` command shown in the error.
 
-## "Docker not found" on the server
+## Docker or Compose missing
 
-`ship deploy` doesn't install Docker for you automatically today — `ship connect`/`ship doctor` will tell you it's missing. Install it yourself first: `apt-get install -y docker.io docker-compose-plugin` (Ubuntu/Debian), then re-run `ship deploy`.
+Ship does not install them. Follow the [Docker Engine install guide](https://docs.docker.com/engine/install/), and add your user to the `docker` group.
 
-## AI provider key invalid
+## "port 80 on the server is already in use"
 
-`ship doctor` calls `Ping()` on your configured provider. If it fails, double check `ai.api_key` via `ship config` — a masked preview is shown. For Gemini specifically, keys should start with `AIza`; `ship config` warns if yours doesn't.
+Something Ship did not start is listening on port 80, such as a host nginx or another app. Ship will not stop it. Free the port or use another server. Several apps per server are not supported yet.
 
-## Containers never come up / deploy times out
+## The build fails
 
-`ship deploy` polls for up to 3 minutes after `docker compose up -d --build`, then prints the tail of the build log. Most often this is a bad generated Dockerfile/Compose file for an unusual project layout, or the server running low on disk/memory (check with `ship connect`). SSH into the server and run `docker compose logs` in the app directory for the full picture.
+The build output is shown as it runs and saved to `~/ship/<app-name>/deploy.log`. Your running containers are not changed. Common causes: the generated Dockerfile does not suit your project layout (add your own Dockerfile and keep it when asked), or the server is out of disk or memory.
 
-## Health check fails but the app looks fine on the server
+A file you need may have been excluded from the upload; see [what is uploaded](configuration.md#what-is-uploaded).
 
-The health check does a plain HTTP GET to your domain (or the server's IP if you didn't set one) and only treats responses `>= 500` as failures — redirects and 4xxs count as "up". If it's still failing, check that Nginx is actually listening on port 80 and proxying to `app:<port>` inside the container network, and that no firewall is blocking inbound port 80/443.
+## "the app container is not staying up"
+
+The app started and then exited or restarted; the last log lines are included in the error. Check the values in `~/ship/<app-name>/.env` on the server and that `app.port` matches the port your app listens on.
+
+## "another deployment of this app appears to be running"
+
+A second `ship deploy` holds the lock. It is released automatically when that command ends or its connection drops.
+
+## Health check fails
+
+Ship requests port 80 on the server, using your domain as the `Host` header. Any status below 500 counts as up. Check your firewall allows port 80. This check does not verify your DNS.
 
 ## Where do my SSH keys and API keys live?
 
-- SSH keys: wherever you pointed `server.key_path`, or `~/.ssh/ship_ed25519` if Ship generated one for you. Never sent anywhere — used only to sign the local SSH handshake.
-- AI API key: stored in `.ship/config.yaml` (mode `0600`, gitignored) and sent only to your configured AI provider.
+- SSH keys: wherever `server.key_path` points. Used only to sign the SSH handshake.
+- AI API key: `.ship/config.yaml` (mode `0600`), sent only to your provider.
 
-See [Architecture](architecture.md#where-credentials-go) for more.
-
-Didn't find your issue here? Open a [GitHub issue](https://github.com/Koded0214h/ship/issues) — see [CONTRIBUTING.md](../CONTRIBUTING.md#reporting-bugs) for what to include.
+Still stuck? Open a [GitHub issue](https://github.com/Koded0214h/ship/issues). Report security problems privately, as described in [SECURITY.md](../SECURITY.md).

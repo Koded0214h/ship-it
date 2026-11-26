@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"fmt"
 	"os"
+	"os/signal"
+	"runtime/debug"
 
-	"github.com/charmbracelet/lipgloss"
 	"github.com/Koded0214h/ship/internal/ui"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/spf13/cobra"
 )
 
@@ -16,10 +19,27 @@ var rootCmd = &cobra.Command{
 	Short:   "Deploy your apps to your own VPS using natural language",
 	Version: version,
 	Long:    banner(),
+	// Errors are printed once by Execute; usage text would bury them.
+	SilenceErrors: true,
+	SilenceUsage:  true,
 }
 
 func Execute() {
-	if err := rootCmd.Execute(); err != nil {
+	// "go install" builds have no ldflags; take the version from the module.
+	if version == "dev" {
+		if info, ok := debug.ReadBuildInfo(); ok && info.Main.Version != "" && info.Main.Version != "(devel)" {
+			rootCmd.Version = info.Main.Version
+		}
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	defer stop()
+	go func() {
+		<-ctx.Done()
+		stop() // a second Ctrl+C exits immediately
+	}()
+
+	if err := rootCmd.ExecuteContext(ctx); err != nil {
 		fmt.Fprintln(os.Stderr, ui.ErrorStyle.Render(err.Error()))
 		os.Exit(1)
 	}

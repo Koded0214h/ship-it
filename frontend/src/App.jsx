@@ -245,17 +245,15 @@ const AUTO_SEQ = [
   { k: 'ok',      t: '✓ Redis detected' },
   { k: 'blank' },
   { k: 'label',   t: 'Describe your deployment' },
-  { k: 'user',    t: 'Deploy with PostgreSQL & Redis. HTTPS. Auto-deploy on push to main.' },
+  { k: 'user',    t: 'Deploy with PostgreSQL & Redis.' },
   { k: 'blank' },
   { k: 'spin',    t: 'Generating deployment plan' },
   { k: 'blank' },
   { k: 'ok',      t: '✓ Dockerfile generated' },
   { k: 'ok',      t: '✓ Docker Compose ready' },
   { k: 'ok',      t: '✓ Nginx configured' },
-  { k: 'ok',      t: '✓ GitHub Actions created' },
-  { k: 'ok',      t: "✓ SSL via Let's Encrypt" },
   { k: 'blank' },
-  { k: 'url',     t: '🚀  https://myapp.example.com' },
+  { k: 'url',     t: '🚀  http://myapp.example.com' },
 ]
 const FRAMES = ['⠋','⠙','⠹','⠸','⠼','⠴','⠦','⠧','⠇','⠏']
 
@@ -354,10 +352,8 @@ function Terminal() {
         { k: 'ok',   t: '✓ Dockerfile generated' },
         { k: 'ok',   t: '✓ Docker Compose ready' },
         { k: 'ok',   t: '✓ Nginx configured' },
-        { k: 'ok',   t: '✓ GitHub Actions created' },
-        { k: 'ok',   t: '✓ SSL enabled' },
         { k: 'blank' },
-        { k: 'url',  t: '🚀  https://myapp.example.com' },
+        { k: 'url',  t: '🚀  http://myapp.example.com' },
       ]
       let delay = 300
       responses.forEach((r, i) => {
@@ -434,7 +430,7 @@ function Terminal() {
 }
 
 /* ─── Marquee ───────────────────────────────────────── */
-const TECH = ['Docker','Docker Compose','Nginx','PostgreSQL','Redis','GitHub Actions','Let\'s Encrypt','SSH','Certbot','Ubuntu VPS']
+const TECH = ['Docker','Docker Compose','Nginx','PostgreSQL','Redis','SSH','Ubuntu VPS']
 function Marquee() {
   const items = [...TECH, ...TECH]
   return (
@@ -456,10 +452,9 @@ function Marquee() {
 const FEATURES = [
   { icon: 'scan',   name: 'Project detection',   desc: 'Auto-detects your language, framework, port, and dependencies. No config files needed.', detail: 'Supports Go, Python, Node.js, Ruby, Java, Rust, and PHP. Detects Django, FastAPI, Express, Next.js, Rails, Gin, and more out of the box.' },
   { icon: 'docker', name: 'Docker generation',    desc: 'Multi-stage Dockerfiles and Docker Compose with health checks, non-root users, and restart policies.', detail: 'Generates production-ready configurations tailored to your stack. PostgreSQL, Redis, and worker services included automatically when detected.' },
-  { icon: 'globe',  name: 'Nginx + HTTPS',        desc: 'Nginx runs as a Docker container — no system permissions required. Certbot handles SSL certificates.', detail: 'Your nginx.conf is mounted from your app directory. Let\'s Encrypt certificates are provisioned automatically on first deploy.' },
-  { icon: 'git',    name: 'GitHub Actions CI/CD', desc: 'Auto-deploy on push to main. Full workflow: build, push, SSH into server, restart containers.', detail: 'The generated workflow file goes straight into .github/workflows/deploy.yml. Secrets mapping is included in the deployment plan.' },
+  { icon: 'globe',  name: 'Nginx reverse proxy',  desc: 'Nginx runs as a Docker container in front of your app.', detail: 'Your nginx.conf is mounted from your app directory. HTTPS is planned and not supported yet.' },
   { icon: 'lock',   name: 'Secure by design',     desc: 'SSH keys never leave your machine. All server operations run locally through the CLI.', detail: 'Only project metadata is sent to your configured AI provider. No credentials, no server access, no Ship cloud.' },
-  { icon: 'pulse',  name: 'Built-in diagnostics', desc: 'ship doctor checks SSH, Docker, AI key validity, and domain DNS in one command.', detail: 'Identifies the exact failure point with actionable messages. No more digging through logs to find out why a deploy failed.' },
+  { icon: 'pulse',  name: 'Built-in diagnostics', desc: 'ship doctor checks SSH, Docker, AI key validity, and domain DNS in one command.', detail: 'Reports which check failed and why, so you know where to look.' },
 ]
 
 function Features() {
@@ -503,9 +498,9 @@ function Features() {
 /* ─── How it works ──────────────────────────────────── */
 const FLOW_NODES = [
   { icon: 'scan',   label: 'Detect',   lines: ['$ ship init', '', '✓ Go project detected', '✓ Gin framework', '✓ Port 8080', '✓ PostgreSQL found'] },
-  { icon: 'pulse',  label: 'Describe', lines: ['› Deploy with HTTPS,', '  PostgreSQL, CI/CD', '  on push to main.'] },
-  { icon: 'docker', label: 'Generate', lines: ['✓ Dockerfile', '✓ docker-compose.yml', '✓ nginx.conf', '✓ .github/workflows/'] },
-  { icon: 'globe',  label: 'Deploy',   lines: ['✓ Files uploaded', '✓ Containers started', '✓ SSL issued', '', '🚀  https://myapp.com'] },
+  { icon: 'pulse',  label: 'Describe', lines: ['› Deploy my API', '  with PostgreSQL', '  and Redis.'] },
+  { icon: 'docker', label: 'Generate', lines: ['✓ Dockerfile', '✓ docker-compose.yml', '✓ nginx.conf'] },
+  { icon: 'globe',  label: 'Deploy',   lines: ['✓ Files uploaded', '✓ Containers started', '✓ Health check passed', '', '🚀  http://myapp.com'] },
 ]
 
 function HowItWorks() {
@@ -555,7 +550,7 @@ function Stats() {
   const STATS = [
     { n: '7',   unit: '',   label: 'Languages detected' },
     { n: '3',   unit: '',   label: 'AI providers' },
-    { n: '<5',  unit: 'min',label: 'First deploy' },
+    { n: 'MIT', unit: '',   label: 'Open source' },
     { n: '100%', unit: '',  label: 'Your infrastructure' },
   ]
   return (
@@ -677,7 +672,7 @@ export default function App() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 1, delay: 0.52, ease: [0.25, 0.4, 0.25, 1] }}
           >
-            Describe your deployment. Ship generates the infrastructure and runs it on your own server.
+            Describe your deployment. Ship generates the infrastructure and runs it on your own server. Alpha: use a disposable server.
           </motion.p>
           <motion.div
             className="hero-ctas"
@@ -750,7 +745,7 @@ export default function App() {
             <div className="rm-col">
               <div className="rm-label done">Shipped ↗</div>
               <div className="rm-list">
-                {['Project detection','SSH connections','Dockerfile generation','Docker Compose generation','GitHub Actions CI/CD','Nginx configuration','HTTPS via Let\'s Encrypt','Live log streaming','ship doctor diagnostics'].map(t => (
+                {['Project detection','SSH connections','Dockerfile generation','Docker Compose generation','Nginx configuration','Live log streaming','ship doctor diagnostics'].map(t => (
                   <div className="rm-item" key={t}>
                     <Icon name="check" size={14} className="rm-check" style={{ color: 'var(--accent)', flexShrink: 0 }} />
                     {t}
@@ -761,7 +756,7 @@ export default function App() {
             <div className="rm-col">
               <div className="rm-label soon">Coming soon</div>
               <div className="rm-list">
-                {['Rollbacks','Deployment history','Interactive plan editing','Environment variable management','Monitoring integrations','Automatic backups','Multi-server deployments','Background workers & cron','Plugin system'].map(t => (
+                {['Automatic HTTPS','CI/CD generation','Rollbacks','Deployment history','Interactive plan editing','Environment variable management','Monitoring integrations','Automatic backups','Multi-server deployments','Background workers & cron','Plugin system'].map(t => (
                   <div className="rm-item" key={t} style={{ color: 'var(--text-3)' }}>
                     <span style={{ color: 'var(--text-3)', flexShrink: 0, width: 14, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>—</span>
                     {t}

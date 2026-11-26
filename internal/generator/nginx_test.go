@@ -55,3 +55,18 @@ func TestNginxConfigSSLIgnoredWithoutDomain(t *testing.T) {
 		t.Errorf("did not expect SSL directives when domain is empty, got:\n%s", cfg)
 	}
 }
+
+func TestNginxConfigDoesNotShadowAppRoutes(t *testing.T) {
+	for _, ssl := range []bool{false, true} {
+		if cfg := NginxConfig("example.com", "myapp", 3000, ssl); contains(cfg, "location /health") {
+			t.Errorf("proxy must not answer the app's /health routes:\n%s", cfg)
+		}
+	}
+}
+
+func TestSSLNginxTemplateHasBalancedSyntax(t *testing.T) {
+	cfg := NginxConfig("example.com", "myapp", 3000, true)
+	if contains(cfg, "/*") || strings.Count(cfg, "{") != strings.Count(cfg, "}") {
+		t.Errorf("invalid nginx syntax:\n%s", cfg)
+	}
+}

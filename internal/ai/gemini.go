@@ -4,8 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/generative-ai-go/genai"
 	"github.com/Koded0214h/ship/internal/detector"
+	"github.com/google/generative-ai-go/genai"
 	"google.golang.org/api/option"
 )
 

@@ -63,7 +63,7 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/Koded0214h/ship"
-    description: "Deploy to your VPS using plain English. AI-generated Docker, Nginx, SSL, and CI/CD."
+    description: "Deploy to your VPS using plain English. Docker and Nginx deployments, with or without AI."
     license: "MIT"
     install: |
       bin.install "ship"
