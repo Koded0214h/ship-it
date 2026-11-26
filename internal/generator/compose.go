@@ -11,7 +11,7 @@ func DockerCompose(info *detector.ProjectInfo, appName string, port int, ssl boo
 	var sb strings.Builder
 
 	sb.WriteString("services:\n")
-	sb.WriteString(appService(info, appName, port))
+	sb.WriteString(appService(info, appName))
 	sb.WriteString(nginxService(ssl))
 
 	if info.HasDatabase {
@@ -39,25 +39,19 @@ func DockerCompose(info *detector.ProjectInfo, appName string, port int, ssl boo
 	return sb.String()
 }
 
-func appService(info *detector.ProjectInfo, appName string, port int) string {
+// The app publishes no port on the server: nginx reaches it over the Compose
+// network, so apps cannot collide on host ports.
+func appService(info *detector.ProjectInfo, appName string) string {
 	depends := dependsOn(info)
 	return fmt.Sprintf(`  app:
     build: .
     container_name: %s
     restart: unless-stopped
-    ports:
-      - "127.0.0.1:%d:%d"
     env_file:
       - .env
     networks:
       - app%s
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:%d/"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
-`, appName, port, port, depends, port)
+`, appName, depends)
 }
 
 func nginxService(ssl bool) string {
@@ -163,7 +157,7 @@ func workerService(info *detector.ProjectInfo, appName string) string {
 func workerCommand(info *detector.ProjectInfo) string {
 	switch info.Framework {
 	case "Django":
-		return `["python", "-m", "celery", "-A", "config", "worker", "--loglevel=info"]`
+		return fmt.Sprintf(`["python", "-m", "celery", "-A", "%s", "worker", "--loglevel=info"]`, djangoProject(info.RootDir))
 	case "Rails":
 		return `["bundle", "exec", "sidekiq"]`
 	}

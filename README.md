@@ -163,7 +163,8 @@ The no-key path generates a Dockerfile, `docker-compose.yml` and Nginx config fr
 
 Backend
 
-* Framework agnostic — Ship detects your stack and generates configs to match, rather than requiring a specific framework.
+* Ship detects your stack and generates configs to match. The apps in [`examples/`](examples/) are built and requested over HTTP in CI: Node (Express, pnpm, TypeScript build), Python (Flask, FastAPI, Django, Pipenv, pyproject), Go, Rust, Java (Maven), Ruby (Sinatra) and PHP.
+* Other layouts and frameworks (for example Next.js, NestJS, Rails, Gradle) are detected but not tested. You can always keep your own Dockerfile.
 
 Infrastructure
 

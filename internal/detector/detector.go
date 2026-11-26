@@ -79,7 +79,7 @@ func detectLanguageAndFramework(info *ProjectInfo, dir string) {
 		info.Framework = detectRubyFramework(dir)
 		return
 	}
-	if exists(dir, "pom.xml") || exists(dir, "build.gradle") {
+	if exists(dir, "pom.xml") || exists(dir, "build.gradle") || exists(dir, "build.gradle.kts") {
 		info.Language = "Java"
 		info.Framework = "Spring Boot"
 		return
@@ -279,7 +279,7 @@ func defaultPort(framework string) int {
 func isPackageFile(name string) bool {
 	switch name {
 	case "go.mod", "package.json", "requirements.txt", "Pipfile", "pyproject.toml",
-		"Gemfile", "pom.xml", "build.gradle", "Cargo.toml", "composer.json":
+		"Gemfile", "pom.xml", "build.gradle", "build.gradle.kts", "Cargo.toml", "composer.json":
 		return true
 	}
 	return false

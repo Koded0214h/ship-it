@@ -11,11 +11,12 @@ app:
   name: my-api      # required. Letters, digits, '.', '_', '-'. Used as the remote directory name
   domain: ""        # optional hostname (no scheme or path). Blank deploys on the server's IP
   port: 8000        # the port your app listens on inside its container. 0 = detect
+  public_port: 0    # server port that serves the app. 0 = 80. Set another if 80 is taken
 
 server:
   host: ""          # required. IP or hostname of your VPS
   user: ""          # required. SSH user, who must be able to run docker
-  key_path: ""      # path to your private SSH key (passphrase-protected keys are not supported yet)
+  key_path: ""      # path to your private SSH key (ssh-agent is used for passphrase-protected keys, or you are asked)
   port: 22          # SSH port, 22 if unset
 
 ai:                 # optional. Leave empty to use the built-in templates
@@ -39,7 +40,23 @@ Every command that talks to your server checks that `app.name`, `server.host` an
 - **Top-level build output:** `dist`, `build`; `target` for Rust and Maven projects; `vendor` for PHP and Ruby.
 - Files over 30 MB, and symlinks that are broken, absolute or point outside the project.
 
-Skipped secrets, build output, large files and symlinks are listed during the deploy. There is no override yet.
+Skipped secrets, build output, large files and symlinks are listed during the deploy.
+
+### `.shipignore`
+
+Put a `.shipignore` in the project root to change this:
+
+```
+# leave these out
+*.log
+docs/
+
+# send these although Ship would skip them
+!certs/ca.pem
+!build
+```
+
+A pattern containing `/` matches the path from the project root; otherwise it matches a name at any depth. `**` is not supported. Anything you re-include is also copied into the image, so only do it for files the app needs.
 
 ## What lives on the server
 

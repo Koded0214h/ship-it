@@ -54,6 +54,10 @@ func buildArchive(ctx context.Context, localDir string) (*bytes.Buffer, []string
 		_, err := os.Stat(filepath.Join(root, name))
 		return err == nil
 	}
+	rules, err := LoadIgnore(root)
+	if err != nil {
+		return nil, nil, err
+	}
 	// Top-level build output.
 	topLevel := map[string]bool{"dist": true, "build": true}
 	if has("Cargo.toml") || has("pom.xml") {
@@ -84,7 +88,18 @@ func buildArchive(ctx context.Context, localDir string) (*bytes.Buffer, []string
 		}
 		slashed := filepath.ToSlash(rel)
 
+		included := matchAny(rules.Include, slashed)
+		if matchAny(rules.Exclude, slashed) && !included {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
 		if info.IsDir() {
+			if included {
+				return nil
+			}
 			if skipDirs[info.Name()] {
 				return filepath.SkipDir
 			}
@@ -97,11 +112,11 @@ func buildArchive(ctx context.Context, localDir string) (*bytes.Buffer, []string
 			}
 			return nil // tar recreates directories from file paths
 		}
-		if skipDirs[info.Name()] {
+		if skipDirs[info.Name()] && !included {
 			return nil // e.g. a .git file in a worktree
 		}
-		if IsSecretFile(info.Name()) {
-			skipped = append(skipped, slashed+" (looks like a secret)")
+		if IsSecretFile(info.Name()) && !included {
+			skipped = append(skipped, slashed+" (looks like a secret; add !"+slashed+" to .shipignore to send it)")
 			return nil
 		}
 

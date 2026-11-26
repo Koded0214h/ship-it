@@ -34,18 +34,17 @@ type Config struct {
 	// ConfirmHostKey is asked before trusting a server seen for the first
 	// time. When nil, unknown servers are refused.
 	ConfirmHostKey ConfirmHostKeyFunc
+	// Passphrase is asked when the key is protected and not in ssh-agent.
+	Passphrase PassphraseFunc
 }
 
 func Connect(cfg Config) (*Client, error) {
 	keyPath := expandHome(cfg.KeyPath)
-	key, err := os.ReadFile(keyPath)
+	auth, release, err := authMethod(keyPath, cfg.Passphrase)
 	if err != nil {
-		return nil, fmt.Errorf("reading SSH key %s: %w", keyPath, err)
+		return nil, err
 	}
-	signer, err := ssh.ParsePrivateKey(key)
-	if err != nil {
-		return nil, fmt.Errorf("parsing SSH key: %w", err)
-	}
+	defer release()
 
 	addr := net.JoinHostPort(cfg.Host, strconv.Itoa(cfg.Port))
 	hostKeys, algorithms, err := hostKeyVerifier(cfg.KnownHostsPath, addr, cfg.ConfirmHostKey)
@@ -54,7 +53,7 @@ func Connect(cfg Config) (*Client, error) {
 	}
 	conn, err := ssh.Dial("tcp", addr, &ssh.ClientConfig{
 		User:              cfg.User,
-		Auth:              []ssh.AuthMethod{ssh.PublicKeys(signer)},
+		Auth:              []ssh.AuthMethod{auth},
 		HostKeyCallback:   hostKeys,
 		HostKeyAlgorithms: algorithms,
 		Timeout:           15 * time.Second,

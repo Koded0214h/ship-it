@@ -16,6 +16,12 @@ jobs:
           go-version-file: go.mod
           cache: true
 
+      - name: Format
+        run: test -z "$(gofmt -l cmd internal main.go)" || { gofmt -l cmd internal main.go; exit 1; }
+
+      - name: Modules are tidy
+        run: go mod tidy -diff
+
       - name: Build
         run: go build ./...
 
@@ -23,7 +29,51 @@ jobs:
         run: go vet ./...
 
       - name: Test
-        run: go test ./...
+        run: |
+          sudo apt-get update && sudo apt-get install -y nginx
+          go test -race ./cmd ./internal/...
+
+  go-platforms:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go test ./cmd ./internal/...
+
+  examples:
+    # Builds and runs every example with the generated Dockerfiles.
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go test -tags docker -v -timeout 40m ./internal/generator -run Examples
+
+  vulnerabilities:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      - run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
 
   frontend:
     runs-on: ubuntu-latest

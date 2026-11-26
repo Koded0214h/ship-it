@@ -126,6 +126,7 @@ func applyAI(cfg *config.Config, provider, newKey, model string) error {
 
 func editApp(cfg *config.Config) error {
 	portStr := strconv.Itoa(cfg.App.Port)
+	publicStr := strconv.Itoa(cfg.App.PublicPort)
 	err := huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -141,12 +142,18 @@ func editApp(cfg *config.Config) error {
 				Description("The port your app listens on (0 = detect)").
 				Value(&portStr).
 				Validate(validPort(0)),
+			huh.NewInput().
+				Title("Public port on the server").
+				Description("0 = 80. Change it if something else on the server uses 80").
+				Value(&publicStr).
+				Validate(validPort(0)),
 		),
 	).Run()
 	if err != nil {
 		return err
 	}
 	cfg.App.Port, _ = strconv.Atoi(portStr)
+	cfg.App.PublicPort, _ = strconv.Atoi(publicStr)
 	return nil
 }
 
@@ -204,6 +211,8 @@ func printCurrentConfig(cfg *config.Config) {
 	fmt.Printf("  %s %s\n", label.Render("Name"), value.Render(cfg.App.Name))
 	fmt.Printf("  %s %s\n", label.Render("Domain"), value.Render(orDash(cfg.App.Domain)))
 	fmt.Printf("  %s %s\n", label.Render("Port"), value.Render(strconv.Itoa(cfg.App.Port)))
+
+	fmt.Printf("  %s %s\n", label.Render("Public port"), value.Render(strconv.Itoa(cfg.App.ListenPort())))
 
 	fmt.Println()
 	fmt.Println(ui.BoldStyle.Render("  Server"))

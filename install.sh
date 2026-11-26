@@ -3,7 +3,7 @@ set -e
 
 REPO="Koded0214h/ship"
 BINARY="ship"
-INSTALL_DIR="/usr/local/bin"
+INSTALL_DIR="${SHIP_INSTALL_DIR:-/usr/local/bin}"
 
 # Colors
 RED='\033[0;31m'
@@ -59,6 +59,21 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 curl -fsSL "$URL" -o "$TMP/$ARCHIVE" || fail "Download failed: $URL"
+
+# Verify the download against the release checksums
+curl -fsSL "https://github.com/${REPO}/releases/download/${VERSION}/checksums.txt" -o "$TMP/checksums.txt" \
+  || fail "Could not download checksums.txt"
+EXPECTED="$(awk -v f="$ARCHIVE" '$2 == f {print $1}' "$TMP/checksums.txt")"
+if command -v sha256sum >/dev/null 2>&1; then
+  ACTUAL="$(sha256sum "$TMP/$ARCHIVE" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+  ACTUAL="$(shasum -a 256 "$TMP/$ARCHIVE" | awk '{print $1}')"
+else
+  fail "Neither sha256sum nor shasum found; cannot verify the download"
+fi
+[ -n "$EXPECTED" ] && [ "$EXPECTED" = "$ACTUAL" ] || fail "Checksum mismatch for $ARCHIVE — not installing"
+ok "Checksum verified"
+
 tar -xzf "$TMP/$ARCHIVE" -C "$TMP"
 
 # Install

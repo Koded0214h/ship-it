@@ -145,10 +145,11 @@ func TestCrashLoopAndServerErrorAreFailures(t *testing.T) {
 		status int
 		step   string
 	}{
-		"exited":     {&fakeRemote{state: func() string { return "exited 1" }}, 200, "Verify app container"},
-		"restarting": {&fakeRemote{state: func() string { restarts++; return "running " + strings.Repeat("1", restarts) }}, 200, "Verify app container"},
-		"502":        {&fakeRemote{}, 502, "Health check"},
-		"port taken": {&fakeRemote{port80: "LISTEN 0 511 *:80"}, 200, "Check port 80 is available"},
+		"exited":                {&fakeRemote{state: func() string { return "exited 1" }}, 200, "Verify app container"},
+		"restarting":            {&fakeRemote{state: func() string { restarts++; return "running " + strings.Repeat("1", restarts) }}, 200, "Verify app container"},
+		"502":                   {&fakeRemote{}, 502, "Health check"},
+		"port taken":            {&fakeRemote{port80: "LISTEN 0 511 *:80"}, 200, "Check port 80 is available"},
+		"other port ignores 80": {&fakeRemote{}, 502, "Health check"},
 	}
 	for name, c := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -216,5 +217,37 @@ func TestValidatePlan(t *testing.T) {
 	bad := &ai.DeploymentPlan{Dockerfile: "FROM x", DockerCompose: base, Domain: "a.com; rm -rf /"}
 	if ValidatePlan(bad, t.TempDir()) == nil {
 		t.Error("accepted a malicious domain")
+	}
+}
+
+func TestShipIgnoreIncludesReachTheImage(t *testing.T) {
+	remote := &fakeRemote{}
+	e := newExecutor(t, remote, 200)
+	if err := os.WriteFile(e.localDir+"/.shipignore", []byte("!certs/ca.pem\n!.npmrc\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	e.Run(context.Background(), nil)
+	got := remote.files["/home/u/ship/demo/.dockerignore"]
+	for _, want := range []string{"\n!certs/ca.pem\n", "\n!**/.npmrc\n"} {
+		if !strings.Contains(got, want) {
+			t.Errorf(".dockerignore is missing %q:\n%s", want, got)
+		}
+	}
+}
+
+func TestPublicPort(t *testing.T) {
+	plan := generator.BuildPlan(&detector.ProjectInfo{Language: "Go", Port: 8080, RootDir: t.TempDir()}, "demo", "")
+	got, err := SetPublicPort(plan.DockerCompose, 8090)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(got, "8090:80") || strings.Contains(got, "80:80\n") || strings.Contains(got, "8080:8080") {
+		t.Errorf("want only nginx published, on 8090:\n%s", got)
+	}
+	if same, _ := SetPublicPort(plan.DockerCompose, 0); same != plan.DockerCompose {
+		t.Error("port 80 must leave the file untouched")
+	}
+	if url := healthCheckURL("1.2.3.4", 8090); url != "http://1.2.3.4:8090" {
+		t.Errorf("health URL %s", url)
 	}
 }

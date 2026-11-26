@@ -51,6 +51,7 @@ func init() {
 	rootCmd.AddCommand(deployCmd)
 	rootCmd.AddCommand(doctorCmd)
 	rootCmd.AddCommand(logsCmd)
+	rootCmd.AddCommand(statusCmd)
 	rootCmd.AddCommand(configCmd)
 }
 

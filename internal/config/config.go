@@ -23,6 +23,8 @@ type AppConfig struct {
 	Name   string `yaml:"name"`
 	Domain string `yaml:"domain"`
 	Port   int    `yaml:"port"`
+	// PublicPort is the port on the server that serves the app. 0 means 80.
+	PublicPort int `yaml:"public_port,omitempty"`
 }
 
 type ServerConfig struct {
@@ -152,10 +154,21 @@ func Validate(cfg *Config) []string {
 	if cfg.App.Port < 0 || cfg.App.Port > 65535 {
 		errs = append(errs, "app.port must be between 0 (auto-detect) and 65535")
 	}
+	if p := cfg.App.PublicPort; p < 0 || p > 65535 || p == 22 {
+		errs = append(errs, "app.public_port must be between 0 (meaning 80) and 65535, and not 22")
+	}
 	if cfg.Server.Port < 0 || cfg.Server.Port > 65535 {
 		errs = append(errs, "server.port must be between 1 and 65535")
 	}
 	return errs
+}
+
+// ListenPort is the server port that serves the app.
+func (a AppConfig) ListenPort() int {
+	if a.PublicPort == 0 {
+		return 80
+	}
+	return a.PublicPort
 }
 
 func Exists() bool {
