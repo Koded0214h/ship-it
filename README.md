@@ -5,7 +5,7 @@
 📚 [Docs](docs/README.md) · [Contributing](CONTRIBUTING.md) · [Security](SECURITY.md)
 
 > ⚠️ **Alpha software. Use a disposable or dedicated server, not one you care about.**
-> The released `v0.1.0` binary stops and removes **every** container on the server during a deploy, uploads your local `.env` over the server's, does not verify SSH host keys, and can report success when the build failed. These are being fixed on `main` and are not yet released.
+> **Do not use `v0.1.0`.** It stops and removes **every** container on the server during a deploy, uploads your local `.env` over the server's, does not verify SSH host keys, and can report success when the build failed. Check with `ship --version` and upgrade to `v0.2.0` or later.
 
 Ship is a CLI that deploys your application to your own VPS with Docker Compose and Nginx. It can use an AI provider to plan the deployment, or built-in templates with no AI at all.
 
@@ -113,7 +113,7 @@ curl -fsSL https://raw.githubusercontent.com/Koded0214h/ship/main/install.sh | s
 go install github.com/Koded0214h/ship@latest
 ```
 
-> `go install` fails with `v0.1.0` (module path mismatch) and will work from the next release. Homebrew and the install script currently provide `v0.1.0`, which requires an AI key.
+> Already installed? `brew upgrade ship`, or run the install script again, then check `ship --version`.
 
 ---
 
@@ -153,7 +153,7 @@ ship logs
 
 ## Deploying without an AI key
 
-An AI provider is optional (on `main`; not in `v0.1.0`). If you don't have (or don't want to use) an API key, choose **"Skip — deploy without AI"** during `ship init`, or clear the provider later by selecting **"None — deploy without AI"** in `ship config`. With no key configured, Ship falls back to built-in templates.
+An AI provider is optional. If you don't have (or don't want to use) an API key, choose **"Skip — deploy without AI"** during `ship init`, or clear the provider later by selecting **"None — deploy without AI"** in `ship config`. With no key configured, Ship falls back to built-in templates.
 
 The no-key path generates a Dockerfile, `docker-compose.yml` and Nginx config from your detected framework and dependencies instead of a written description. It asks for your domain (optional) and deploys over HTTP. You can also pass `--no-ai` to skip a configured provider for one run, and if the provider fails Ship offers to continue with the templates.
 
