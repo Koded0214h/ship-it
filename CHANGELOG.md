@@ -7,6 +7,16 @@ and this project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-26
+
+**Upgrade from 0.1.0.** 0.1.0 can remove unrelated containers and overwrite production secrets.
+
+### Known limitations
+- No HTTPS, CI/CD generation or rollback.
+- A redeploy can briefly answer 502 while containers are replaced.
+- One app per server is the supported setup.
+- Only a small Python app has been deployed to a real server. Postgres, Redis, workers and AI-generated plans have not.
+
 ### Security
 - Built with Go 1.26.11 and updated modules, fixing known vulnerabilities in the standard library, `golang.org/x/crypto`, `x/net` and others.
 - SSH host keys are verified against `known_hosts`; new servers must be confirmed and changed keys are refused.
@@ -58,5 +68,6 @@ Initial public release.
 - Support for multiple AI providers.
 - Domain + optional SSL configuration in `.ship/config.yaml`.
 
-[Unreleased]: https://github.com/Koded0214h/ship-it/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/Koded0214h/ship-it/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/Koded0214h/ship-it/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/Koded0214h/ship-it/releases/tag/v0.1.0

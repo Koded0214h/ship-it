@@ -772,7 +772,7 @@ export default function App() {
 
       <footer>
         <div className="footer-inner">
-          <div className="footer-logo"><span>$</span> ship v0.1.0 · MIT License</div>
+          <div className="footer-logo"><span>$</span> ship v0.2.0 · MIT License</div>
           <div className="footer-links">
             <a href="https://github.com/Koded0214h/ship">GitHub</a>
             <a href="#roadmap">Roadmap</a>
